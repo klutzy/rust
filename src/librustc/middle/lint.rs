@@ -74,6 +74,7 @@ pub enum lint {
     non_uppercase_pattern_statics,
     type_limits,
     unused_unsafe,
+    attribute_usage,
 
     managed_heap_memory,
     owned_heap_memory,
@@ -231,6 +232,13 @@ static lint_table: &'static [(&'static str, LintSpec)] = &[
      LintSpec {
         lint: unused_unsafe,
         desc: "unnecessary use of an `unsafe` block",
+        default: warn
+    }),
+
+    ("attribute_usage",
+     LintSpec {
+        lint: attribute_usage,
+        desc: "detects bad use of attributes",
         default: warn
     }),
 
@@ -720,6 +728,27 @@ fn check_heap_item(cx: &Context, it: &ast::item) {
     }
 }
 
+// check if crate-level attribute is used on item,
+// since it is usually caused by mistake of semicolon omission.
+// also make error on obsolete attributes for less confusion.
+fn check_item_attribute_usage(cx: &Context, it: &ast::item) {
+    let crate_attrs = ["crate_type", "link", "feature", "no_uv", "no_main", "no_std"];
+
+    for attr in it.attrs.iter() {
+        let name = attr.node.value.name();
+        for crate_attr in crate_attrs.iter() {
+            if name.equiv(crate_attr) {
+                let msg = match attr.node.style {
+                    ast::AttrOuter  => "crate-level attribute should be an inner attribute: \
+                                   add semicolon at end",
+                    ast::AttrInner => "crate-level attribute should be in the root module",
+                };
+                cx.span_lint(attribute_usage, attr.span, msg);
+            }
+        }
+    }
+}
+
 fn check_heap_expr(cx: &Context, e: &ast::Expr) {
     let ty = ty::expr_ty(cx.tcx, e);
     check_heap_type(cx, e.span, ty);
@@ -1069,6 +1098,7 @@ impl Visitor<()> for Context {
             check_item_non_camel_case_types(cx, it);
             check_item_non_uppercase_statics(cx, it);
             check_heap_item(cx, it);
+            check_item_attribute_usage(cx, it);
 
             do cx.visit_ids |v| {
                 v.visit_item(it, ());
