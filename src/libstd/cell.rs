@@ -10,8 +10,6 @@
 
 //! A mutable, nullable memory location
 
-#[missing_doc];
-
 use cast::transmute_mut;
 use unstable::finally::Finally;
 use prelude::*;
