@@ -22,6 +22,165 @@ use pkgid::PkgId;
 
 use std::hashmap::HashSet;
 
+#[deriving(Eq)]
+pub enum Entry { // hey! this is horrible name. TODO XXX
+    // crate-level
+    EntryCrateType,
+    EntryFeature,
+    EntryNoUv,
+    EntryNoMain,
+    EntryNoStd,
+    EntryPkgid,
+    EntryDesc,
+    EntryComment,
+    EntryLicense,
+    EntryCopyright,
+
+    // item-level
+    EntryAddressInsignificant,
+    EntryThreadLocal, // for statics
+    EntryAllow, // lint options
+    EntryDeny,
+    EntryForbid,
+    EntryWarn,
+    EntryDeprecated, //item stability
+    EntryExperimental,
+    EntryUnstable,
+    EntryStable,
+    EntryLocked,
+    EntryFrozen,
+    EntryCrateMap,
+    EntryCfg,
+    EntryDoc,
+    EntryExportName,
+    EntryLinkSection,
+    EntryNoFreeze,
+    EntryNoMangle,
+    EntryNoSend,
+    EntryStaticAssert,
+    EntryUnsafeNoDropFlag,
+    EntryPacked,
+    EntrySimd,
+    EntryRepr,
+    EntryDeriving,
+    EntryUnsafeDestructor,
+    EntryLink,
+
+    //mod-level
+    EntryPath,
+    EntryLinkName,
+    EntryLinkArgs,
+    EntryNolink,
+    EntryMacroEscape,
+    EntryNoImplicitPrelude,
+
+    // fn-level
+    EntryTest,
+    EntryBench,
+    EntryShouldFail,
+    EntryIgnore,
+    EntryInline,
+    EntryLang,
+    EntryMain,
+    EntryStart,
+    EntryNoSplitStack,
+    EntryCold,
+
+    // internal attribute: bypass privacy inside items
+    EntryResolveUnexported,
+
+    // obsolete
+    EntryAbi,
+    EntryAutoEncode,
+    EntryAutoDecode,
+    EntryFastFfi,
+
+    // unknown attribute
+    EntryUnknown(~str),
+}
+
+impl FromStr for Entry {
+    fn from_str(s: &str) -> Option<Entry> {
+        let v = match s {
+            "crate_type" => EntryCrateType,
+            "feature" => EntryFeature,
+            "no_uv" => EntryNoUv,
+            "no_main" => EntryNoMain,
+            "no_std" => EntryNoStd,
+            "pkgid" => EntryPkgid,
+            "desc" => EntryDesc,
+            "comment" => EntryComment,
+            "license" => EntryLicense,
+            "copyright" => EntryCopyright,
+            "address_insignificant" => EntryAddressInsignificant,
+            "thread_local" => EntryThreadLocal,
+            "allow" => EntryAllow,
+            "deny" => EntryDeny,
+            "forbid" => EntryForbid,
+            "warn" => EntryWarn,
+            "deprecated" => EntryDeprecated,
+            "experimental" => EntryExperimental,
+            "unstable" => EntryUnstable,
+            "stable" => EntryStable,
+            "locked" => EntryLocked,
+            "frozen" => EntryFrozen,
+            "crate_map" => EntryCrateMap,
+            "cfg" => EntryCfg,
+            "doc" => EntryDoc,
+            "export_name" => EntryExportName,
+            "link_section" => EntryLinkSection,
+            "no_freeze" => EntryNoFreeze,
+            "no_mangle" => EntryNoMangle,
+            "no_send" => EntryNoSend,
+            "static_assert" => EntryStaticAssert,
+            "unsafe_no_drop_flag" => EntryUnsafeNoDropFlag,
+            "packed" => EntryPacked,
+            "simd" => EntrySimd,
+            "repr" => EntryRepr,
+            "deriving" => EntryDeriving,
+            "unsafe_destructor" => EntryUnsafeDestructor,
+            "link" => EntryLink,
+            "path" => EntryPath,
+            "link_name" => EntryLinkName,
+            "link_args" => EntryLinkArgs,
+            "nolink" => EntryNolink,
+            "macro_escape" => EntryMacroEscape,
+            "no_implicit_prelude" => EntryNoImplicitPrelude,
+            "test" => EntryTest,
+            "bench" => EntryBench,
+            "should_fail" => EntryShouldFail,
+            "ignore" => EntryIgnore,
+            "inline" => EntryInline,
+            "lang" => EntryLang,
+            "main" => EntryMain,
+            "start" => EntryStart,
+            "no_split_stack" => EntryNoSplitStack,
+            "cold" => EntryCold,
+            "!resolve_unexported" => EntryResolveUnexported,
+
+            _ => EntryUnknown(s.to_owned()),
+        };
+        Some(v)
+    }
+}
+
+impl Entry {
+    pub fn is_crate_attr(&self) -> bool {
+        match *self {
+            EntryCrateType | EntryFeature | EntryNoUv | EntryNoMain | EntryNoStd |
+            EntryPkgid | EntryDesc | EntryComment | EntryLicense | EntryCopyright => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_obsolete(&self) -> bool {
+        match *self {
+            EntryAbi | EntryAutoEncode | EntryAutoDecode | EntryFastFfi => true,
+            _ => false,
+        }
+    }
+}
+
 pub trait AttrMetaMethods {
     // This could be changed to `fn check_name(&self, name: @str) ->
     // bool` which would facilitate a side table recording which
@@ -167,7 +326,7 @@ pub fn mk_sugared_doc_attr(text: @str, lo: BytePos, hi: BytePos) -> Attribute {
 /// Check if `needle` occurs in `haystack` by a structural
 /// comparison. This is slightly subtle, and relies on ignoring the
 /// span included in the `==` comparison a plain MetaItem.
-pub fn contains(haystack: &[@ast::MetaItem],
+fn contains(haystack: &[@ast::MetaItem],
                 needle: @ast::MetaItem) -> bool {
     debug!("attr::contains (name={})", needle.name());
     haystack.iter().any(|item| {
@@ -183,6 +342,15 @@ pub fn contains_name<AM: AttrMetaMethods>(metas: &[AM], name: &str) -> bool {
         name == item.name()
     })
 }
+
+pub fn contains_attr(attrs: &[Attribute], attr: Entry) -> bool {
+    attrs.iter().any(|item| {
+        FromStr::from_str(item).unwrap() == attr
+    })
+}
+
+// TODO
+//pub fn get_attr_value(attrs: &[Attribute],
 
 pub fn first_attr_value_str_by_name(attrs: &[Attribute], name: &str)
                                  -> Option<@str> {
