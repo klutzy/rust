@@ -258,10 +258,10 @@ pub fn bump(rdr: &StringReader) {
         let byte_offset_diff = next.next - current_byte_offset;
         rdr.pos.set(rdr.pos.get() + Pos::from_uint(byte_offset_diff));
         rdr.curr.set(next.ch);
-        rdr.col.set(rdr.col.get() + CharPos(1u));
+        rdr.col.set(rdr.col.get() + CharPos(1));
         if last_char == '\n' {
             rdr.filemap.next_line(rdr.last_pos.get());
-            rdr.col.set(CharPos(0u));
+            rdr.col.set(CharPos(0));
         }
 
         if byte_offset_diff > 1 {
@@ -366,7 +366,7 @@ fn consume_any_line_comment(rdr: @StringReader)
                 files.get().push(rdr.filemap);
             }
             let loc = cmap.lookup_char_pos_adj(rdr.last_pos.get());
-            if loc.line == 1u && loc.col == CharPos(0u) {
+            if loc.line == 1u && loc.col == CharPos(0) {
                 while rdr.curr.get() != '\n' && !is_eof(rdr) { bump(rdr); }
                 return consume_whitespace_and_comments(rdr);
             }

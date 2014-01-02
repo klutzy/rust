@@ -172,7 +172,7 @@ fn push_blank_line_comment(rdr: @StringReader, comments: &mut ~[Comment]) {
 fn consume_whitespace_counting_blank_lines(rdr: @StringReader,
                                            comments: &mut ~[Comment]) {
     while is_whitespace(rdr.curr.get()) && !is_eof(rdr) {
-        if rdr.col.get() == CharPos(0u) && rdr.curr.get() == '\n' {
+        if rdr.col.get() == CharPos(0) && rdr.curr.get() == '\n' {
             push_blank_line_comment(rdr, &mut *comments);
         }
         bump(rdr);

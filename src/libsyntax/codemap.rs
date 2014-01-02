@@ -39,7 +39,7 @@ pub struct BytePos(u32);
 /// is not equivalent to a character offset. The CodeMap will convert BytePos
 /// values to CharPos values as necessary.
 #[deriving(Eq,IterBytes, Ord)]
-pub struct CharPos(uint);
+pub struct CharPos(u32);
 
 // XXX: Lots of boilerplate in these impls, but so far my attempts to fix
 // have been unsuccessful
@@ -62,19 +62,19 @@ impl Sub<BytePos, BytePos> for BytePos {
 }
 
 impl Pos for CharPos {
-    fn from_uint(n: uint) -> CharPos { CharPos(n) }
-    fn to_uint(&self) -> uint { let CharPos(n) = *self; n }
+    fn from_uint(n: uint) -> CharPos { CharPos(n as u32) }
+    fn to_uint(&self) -> uint { let CharPos(n) = *self; n as uint }
 }
 
 impl Add<CharPos,CharPos> for CharPos {
     fn add(&self, rhs: &CharPos) -> CharPos {
-        CharPos(self.to_uint() + rhs.to_uint())
+        CharPos((self.to_uint() + rhs.to_uint()) as u32)
     }
 }
 
 impl Sub<CharPos,CharPos> for CharPos {
     fn sub(&self, rhs: &CharPos) -> CharPos {
-        CharPos(self.to_uint() - rhs.to_uint())
+        CharPos((self.to_uint() - rhs.to_uint()) as u32)
     }
 }
 
@@ -394,8 +394,7 @@ impl CodeMap {
         return a;
     }
 
-    fn lookup_line(&self, pos: BytePos) -> FileMapAndLine
-    {
+    fn lookup_line(&self, pos: BytePos) -> FileMapAndLine {
         let idx = self.lookup_filemap_idx(pos);
 
         let files = self.files.borrow();
@@ -464,7 +463,7 @@ impl CodeMap {
             }
         }
 
-        CharPos(bpos.to_uint() - total_extra_bytes)
+        CharPos((bpos.to_uint() - total_extra_bytes) as u32)
     }
 }
 
