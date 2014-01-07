@@ -8,8 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use version::{try_getting_version, try_getting_local_version,
-              Version, NoVersion, split_version};
+use version::{Version, NoVersion, split_version};
 use std::hash::Streaming;
 use std::hash;
 
@@ -45,16 +44,13 @@ impl CrateId {
     pub fn new(s: &str) -> CrateId {
         use conditions::bad_pkg_id::cond;
 
-        let mut given_version = None;
-
         // Did the user request a specific version?
-        let s = match split_version(s) {
+        let (s, version) = match split_version(s) {
             Some((path, v)) => {
-                given_version = Some(v);
-                path
+                (path, v)
             }
             None => {
-                s
+                (s, NoVersion)
             }
         };
 
@@ -66,17 +62,6 @@ impl CrateId {
             return cond.raise((path, ~"0-length crate_id"));
         }
         let short_name = path.filestem_str().expect(format!("Strange path! {}", s));
-
-        let version = match given_version {
-            Some(v) => v,
-            None => match try_getting_local_version(&path) {
-                Some(v) => v,
-                None => match try_getting_version(&path) {
-                    Some(v) => v,
-                    None => NoVersion
-                }
-            }
-        };
 
         CrateId {
             path: path.clone(),

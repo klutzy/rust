@@ -372,7 +372,7 @@ impl CtxMethods for BuildContext {
             }
             PreferCmd => {
                 if args.len() < 1 {
-                    return usage::uninstall();
+                    return usage::prefer();
                 }
 
                 self.prefer(args[0], None);
