@@ -8,7 +8,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use version::{Version, NoVersion, split_version};
+use version::split_version;
 use std::hash::Streaming;
 use std::hash;
 
@@ -31,7 +31,7 @@ pub struct CrateId {
     /// of package IDs whose short names aren't valid Rust identifiers.
     short_name: ~str,
     /// The requested package version.
-    version: Version
+    version: Option<~str>
 }
 
 impl Eq for CrateId {
@@ -41,6 +41,13 @@ impl Eq for CrateId {
 }
 
 impl CrateId {
+    pub fn get_version<'a>(&'a self) -> &'a str {
+        match self.version {
+            Some(ref ver) => ver.as_slice(),
+            None => "0.0"
+        }
+    }
+
     pub fn new(s: &str) -> CrateId {
         use conditions::bad_pkg_id::cond;
 
@@ -50,7 +57,7 @@ impl CrateId {
                 (path, v)
             }
             None => {
-                (s, NoVersion)
+                (s, None)
             }
         };
 
@@ -73,13 +80,13 @@ impl CrateId {
     pub fn hash(&self) -> ~str {
         // FIXME (#9639): hash should take a &[u8] so we can hash the real path
         self.path.display().with_str(|s| {
-            let vers = self.version.to_str();
+            let vers = self.get_version();
             format!("{}-{}-{}", s, hash(s + vers), vers)
         })
     }
 
     pub fn short_name_with_version(&self) -> ~str {
-        format!("{}{}", self.short_name, self.version.to_str())
+        format!("{}-{}", self.short_name, self.get_version())
     }
 
     /// True if the ID has multiple components
@@ -130,7 +137,7 @@ impl Iterator<(Path, Path)> for Prefixes {
 impl ToStr for CrateId {
     fn to_str(&self) -> ~str {
         // should probably use the filestem and not the whole path
-        format!("{}-{}", self.path.as_str().unwrap(), self.version.to_str())
+        format!("{}-{}", self.path.as_str().unwrap(), self.get_version())
     }
 }
 
