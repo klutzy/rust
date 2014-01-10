@@ -9,8 +9,8 @@
 // except according to those terms.
 
 use version::split_version;
-use std::hash::Streaming;
-use std::hash;
+use extra::hex::ToHex;
+use rustc::util::sha2::{Digest, Sha256};
 
 /// Path-fragment identifier of a package such as
 /// 'github.com/graydon/test'; path must be a relative
@@ -41,7 +41,7 @@ impl Eq for CrateId {
 }
 
 impl CrateId {
-    pub fn get_version<'a>(&'a self) -> &'a str {
+    pub fn version_or_default<'a>(&'a self) -> &'a str {
         match self.version {
             Some(ref ver) => ver.as_slice(),
             None => "0.0"
@@ -77,16 +77,24 @@ impl CrateId {
         }
     }
 
+    pub fn to_crate_id_str(&self) -> ~str {
+        format!("{}\\#{}", self.path.as_str().unwrap(), self.version_or_default())
+    }
+
+    pub fn to_lib_name(&self) -> ~str {
+        format!("{}-{}-{}", self.short_name, self.hash(), self.version_or_default())
+    }
+
     pub fn hash(&self) -> ~str {
-        // FIXME (#9639): hash should take a &[u8] so we can hash the real path
-        self.path.display().with_str(|s| {
-            let vers = self.get_version();
-            format!("{}-{}-{}", s, hash(s + vers), vers)
-        })
+        let mut hasher = Sha256::new();
+        hasher.reset();
+        hasher.input_str(self.to_crate_id_str());
+        let hash = hasher.result_bytes().to_hex();
+        hash.slice_chars(0, 8).to_owned()
     }
 
     pub fn short_name_with_version(&self) -> ~str {
-        format!("{}-{}", self.short_name, self.get_version())
+        format!("{}-{}", self.short_name, self.version_or_default())
     }
 
     /// True if the ID has multiple components
@@ -137,18 +145,10 @@ impl Iterator<(Path, Path)> for Prefixes {
 impl ToStr for CrateId {
     fn to_str(&self) -> ~str {
         // should probably use the filestem and not the whole path
-        format!("{}-{}", self.path.as_str().unwrap(), self.get_version())
+        format!("{}-{}", self.path.as_str().unwrap(), self.version_or_default())
     }
 }
-
 
 pub fn write<W: Writer>(writer: &mut W, string: &str) {
     writer.write(string.as_bytes());
 }
-
-pub fn hash(data: ~str) -> ~str {
-    let hasher = &mut hash::default_state();
-    write(hasher, data);
-    hasher.result_str()
-}
-
