@@ -22,7 +22,7 @@ pub struct CrateId {
     /// github.com/mozilla/quux-whatever (it's assumed that if we're
     /// working with a package ID of this form, rustpkg has already cloned
     /// the sources into a local directory in the RUST_PATH).
-    path: Path,
+    path: ~str,
     /// Short name. This is the path's filestem, but we store it
     /// redundantly so as to not call get() everywhere (filestem() returns an
     /// option)
@@ -71,14 +71,14 @@ impl CrateId {
         let name = path.filestem_str().expect(format!("Strange path! {}", s));
 
         CrateId {
-            path: path.clone(),
+            path: s.to_owned(),
             name: name.to_owned(),
             version: version
         }
     }
 
     pub fn to_crate_id_str(&self) -> ~str {
-        format!("{}\\#{}", self.path.as_str().unwrap(), self.version_or_default())
+        format!("{}\\#{}", self.path, self.version_or_default())
     }
 
     pub fn to_lib_name(&self) -> ~str {
@@ -99,11 +99,11 @@ impl CrateId {
 
     /// True if the ID has multiple components
     pub fn is_complex(&self) -> bool {
-        self.name.as_bytes() != self.path.as_vec()
+        self.name != self.path
     }
 
     pub fn prefixes(&self) -> Prefixes {
-        prefixes(&self.path)
+        prefixes(&Path::new(self.path.as_slice()))
     }
 
     // This is the workcache function name for the *installed*
@@ -145,7 +145,7 @@ impl Iterator<(Path, Path)> for Prefixes {
 impl ToStr for CrateId {
     fn to_str(&self) -> ~str {
         // should probably use the filestem and not the whole path
-        format!("{}-{}", self.path.as_str().unwrap(), self.version_or_default())
+        format!("{}-{}", self.path, self.version_or_default())
     }
 }
 

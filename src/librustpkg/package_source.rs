@@ -98,21 +98,22 @@ impl PkgSrc {
         } else {
             // We search for sources under both src/ and build/ , because build/ is where
             // automatically-checked-out sources go.
+            let path = Path::new(id.path.as_slice());
             let mut result = source_workspace.join("src");
-            result.push(&id.path.dir_path());
+            result.push(&path.dir_path());
             result.push(id.short_name_with_version());
             to_try.push(result);
             let mut result = source_workspace.join("src");
-            result.push(&id.path);
+            result.push(&path);
             to_try.push(result);
 
             let mut result = build_dir.join("src");
-            result.push(&id.path.dir_path());
+            result.push(&path.dir_path());
             result.push(id.short_name_with_version());
             to_try.push(result.clone());
             output_names.push(result);
             let mut other_result = build_dir.join("src");
-            other_result.push(&id.path);
+            other_result.push(&path);
             to_try.push(other_result.clone());
             output_names.push(other_result);
 
@@ -134,7 +135,7 @@ impl PkgSrc {
                 // That is, is this a package ID that points into the middle of a workspace?
                 for (prefix, suffix) in id.prefixes() {
                     let crate_id = CrateId::new(prefix.as_str().unwrap());
-                    let path = build_dir.join(&crate_id.path);
+                    let path = build_dir.join(crate_id.path.as_slice());
                     debug!("in loop: checking if {} is a directory", path.display());
                     if path.is_dir() {
                         let ps = PkgSrc::new(source_workspace,
@@ -179,11 +180,12 @@ impl PkgSrc {
                     }
                     match ok_d {
                         Some(ref d) => {
-                            if d.is_ancestor_of(&id.path)
-                                || d.is_ancestor_of(&versionize(&id.path, &id.version)) {
+                            let path = Path::new(id.path.as_slice());
+                            if d.is_ancestor_of(&path)
+                                || d.is_ancestor_of(&versionize(id.path, &id.version)) {
                                 // Strip off the package ID
                                 source_workspace = d.clone();
-                                for _ in id.path.components() {
+                                for _ in path.components() {
                                     source_workspace.pop();
                                 }
                                 // Strip off the src/ part
@@ -268,24 +270,25 @@ impl PkgSrc {
         use conditions::git_checkout_failed::cond;
 
         let cwd = os::getcwd();
+        let path = Path::new(crateid.path.as_slice());
         debug!("Checking whether {} (path = {}) exists locally. Cwd = {}, does it? {:?}",
-                crateid.to_str(), crateid.path.display(),
+                crateid.to_str(), crateid.path,
                 cwd.display(),
-                crateid.path.exists());
+                path.exists());
 
-        match safe_git_clone(&crateid.path, &crateid.version, local) {
+        match safe_git_clone(&path, &crateid.version, local) {
             CheckedOutSources => {
                 make_read_only(local);
                 Some(local.clone())
             }
             DirToUse(clone_target) => {
-                if crateid.path.components().nth(1).is_none() {
+                if path.components().nth(1).is_none() {
                     // If a non-URL, don't bother trying to fetch
                     return None;
                 }
 
                 // FIXME (#9639): This needs to handle non-utf8 paths
-                let url = format!("https://{}", crateid.path.as_str().unwrap());
+                let url = format!("https://{}", path.as_str().unwrap());
                 debug!("Fetching package: git clone {} {} [version={}]",
                         url, clone_target.display(), crateid.version_or_default());
 

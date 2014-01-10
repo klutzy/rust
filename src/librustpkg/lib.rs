@@ -366,7 +366,7 @@ impl CtxMethods for BuildContext {
             ListCmd => {
                 println!("Installed packages:");
                 installed_packages::list_installed_packages(|pkg_id| {
-                    pkg_id.path.display().with_str(|s| println!("{}", s));
+                    println!("{}", pkg_id.path);
                     true
                 });
             }
@@ -441,24 +441,24 @@ impl CtxMethods for BuildContext {
         let workspace = pkg_src.source_workspace.clone();
         let crateid = pkg_src.id.clone();
 
+        let path = crateid.path.as_slice();
         debug!("build: workspace = {} (in Rust path? {:?} is git dir? {:?} \
                 crateid = {} pkgsrc start_dir = {}", workspace.display(),
-               in_rust_path(&workspace), is_git_dir(&workspace.join(&crateid.path)),
+               in_rust_path(&workspace), is_git_dir(&workspace.join(path)),
                crateid.to_str(), pkg_src.start_dir.display());
         debug!("build: what to build = {:?}", what_to_build);
 
         // If workspace isn't in the RUST_PATH, and it's a git repo,
         // then clone it into the first entry in RUST_PATH, and repeat
-        if !in_rust_path(&workspace) && is_git_dir(&workspace.join(&crateid.path)) {
+        if !in_rust_path(&workspace) && is_git_dir(&workspace.join(path)) {
             let mut out_dir = default_workspace().join("src");
-            out_dir.push(&crateid.path);
-            let git_result = source_control::safe_git_clone(&workspace.join(&crateid.path),
+            out_dir.push(path);
+            let git_result = source_control::safe_git_clone(&workspace.join(path),
                                                             &crateid.version,
                                                             &out_dir);
             match git_result {
                 CheckedOutSources => make_read_only(&out_dir),
-                // FIXME (#9639): This needs to handle non-utf8 paths
-                _ => cond.raise((crateid.path.as_str().unwrap().to_owned(), out_dir.clone()))
+                _ => cond.raise((path.to_owned(), out_dir.clone()))
             };
             let default_ws = default_workspace();
             debug!("Calling build recursively with {:?} and {:?}", default_ws.display(),

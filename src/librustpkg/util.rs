@@ -174,7 +174,7 @@ pub fn compile_input(context: &BuildContext,
     // not sure if we should support anything else
 
     let mut out_dir = target_build_dir(workspace);
-    out_dir.push(&crate_id.path);
+    out_dir.push(crate_id.path.as_slice());
     // Make the output directory if it doesn't exist already
     fs::mkdir_recursive(&out_dir, io::UserRWX);
 
@@ -511,8 +511,8 @@ impl<'a> Visitor<()> for ViewItemVisitor<'a> {
                                  // Nonexistent package? Then print a better error
                                  error(format!("Package {} depends on {}, but I don't know \
                                                how to find it",
-                                               self.parent.path.display(),
-                                               crate_id.path.display()));
+                                               self.parent.path,
+                                               crate_id.path));
                                  fail!()
                         }).inside(|| {
                             PkgSrc::new(source_workspace.clone(),

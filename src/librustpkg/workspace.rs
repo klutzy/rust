@@ -11,7 +11,6 @@
 // rustpkg utilities having to do with workspaces
 
 use std::os;
-use std::path::Path;
 use context::Context;
 use path_util::{workspace_contains_crate_id, find_dir_using_rust_path_hack, default_workspace};
 use path_util::rust_path;
@@ -29,7 +28,7 @@ pub fn each_pkg_parent_workspace(cx: &Context,
         // tjc: make this a condition
         fail!("Package {} not found in any of \
                     the following workspaces: {}",
-                   crateid.path.display(),
+                   crateid.path,
                    rust_path().map(|p| p.display().to_str()).to_str());
     }
     for ws in workspaces.iter() {

@@ -58,17 +58,16 @@ fn fake_ctxt(sysroot: Path, workspace: &Path) -> BuildContext {
 }
 
 fn fake_pkg() -> CrateId {
-    let sn = ~"bogus";
     CrateId {
-        path: Path::new(sn.as_slice()),
-        name: sn,
+        path: ~"bogus",
+        name: ~"bogus",
         version: None
     }
 }
 
 fn git_repo_pkg() -> CrateId {
     CrateId {
-        path: Path::new("mockgithub.com/catamorphism/test-pkg"),
+        path: ~"mockgithub.com/catamorphism/test-pkg",
         name: ~"test-pkg",
         version: None
     }
@@ -653,7 +652,8 @@ fn test_install_invalid_external() {
 #[test]
 fn test_install_git() {
     let temp_pkg_id = git_repo_pkg();
-    let repo = init_git_repo(&temp_pkg_id.path);
+    let path = Path::new(temp_pkg_id.path.as_slice());
+    let repo = init_git_repo(&path);
     let repo = repo.path();
     debug!("repo = {}", repo.display());
     let repo_subdir = repo.join_many(["mockgithub.com", "catamorphism", "test-pkg"]);
@@ -670,10 +670,9 @@ fn test_install_git() {
     add_git_tag(&repo_subdir, ~"0.1"); // this has the effect of committing the files
 
     debug!("test_install_git: calling rustpkg install {} in {}",
-           temp_pkg_id.path.display(), repo.display());
+           temp_pkg_id.path, repo.display());
     // should have test, bench, lib, and main
-    // FIXME (#9639): This needs to handle non-utf8 paths
-    command_line_test([~"install", temp_pkg_id.path.as_str().unwrap().to_owned()], repo);
+    command_line_test([~"install", temp_pkg_id.path.to_owned()], repo);
     let ws = repo.join(".rust");
     // Check that all files exist
     debug!("Checking for files in {}", ws.display());
@@ -1007,7 +1006,7 @@ fn install_check_duplicates() {
     let mut contents = ~[];
     let check_dups = |p: &CrateId| {
         if contents.contains(p) {
-            fail!("package {} appears in `list` output more than once", p.path.display());
+            fail!("package {} appears in `list` output more than once", p.path);
         }
         else {
             contents.push((*p).clone());
@@ -1156,7 +1155,7 @@ fn test_uninstall() {
 #[test]
 fn test_non_numeric_tag() {
     let temp_pkg_id = git_repo_pkg();
-    let repo = init_git_repo(&temp_pkg_id.path);
+    let repo = init_git_repo(&Path::new(temp_pkg_id.path.as_slice()));
     let repo = repo.path();
     let repo_subdir = repo.join_many(["mockgithub.com", "catamorphism", "test-pkg"]);
     writeFile(&repo_subdir.join("foo"), "foo");
@@ -1168,9 +1167,7 @@ fn test_non_numeric_tag() {
     writeFile(&repo_subdir.join("not_on_testbranch_only"), "bye bye");
     add_all_and_commit(&repo_subdir);
 
-    // FIXME (#9639): This needs to handle non-utf8 paths
-    command_line_test([~"install", format!("{}\\#testbranch",
-                                           temp_pkg_id.path.as_str().unwrap())], repo);
+    command_line_test([~"install", format!("{}\\#testbranch", temp_pkg_id.path)], repo);
     let file1 = repo.join_many(["mockgithub.com", "catamorphism", "test-pkg", "testbranch_only"]);
     let file2 = repo.join_many(["mockgithub.com", "catamorphism", "test-pkg", "master_only"]);
     assert!(file1.exists());
@@ -2121,7 +2118,7 @@ fn test_no_rebuilding() {
 #[test]
 fn test_installed_local_changes() {
     let temp_pkg_id = git_repo_pkg();
-    let repo = init_git_repo(&temp_pkg_id.path);
+    let repo = init_git_repo(&Path::new(temp_pkg_id.path.as_slice()));
     let repo = repo.path();
     debug!("repo = {}", repo.display());
     let repo_subdir = repo.join_many(["mockgithub.com", "catamorphism", "test-pkg"]);
@@ -2134,9 +2131,7 @@ fn test_installed_local_changes() {
               "pub fn f() { let _x = (); }");
     add_git_tag(&repo_subdir, ~"0.1"); // this has the effect of committing the files
 
-    // FIXME (#9639): This needs to handle non-utf8 paths
-    command_line_test([~"install", temp_pkg_id.path.as_str().unwrap().to_owned()], repo);
-
+    command_line_test([~"install", temp_pkg_id.path.to_owned()], repo);
 
     // We installed the dependency.
     // Now start a new workspace and clone it into it
@@ -2168,9 +2163,7 @@ fn test_installed_local_changes() {
               fn main() { g(); }");
     // And make sure we can build it
 
-    // FIXME (#9639): This needs to handle non-utf8 paths
-    command_line_test([~"build", importer_pkg_id.path.as_str().unwrap().to_owned()],
-                      hacking_workspace);
+    command_line_test([~"build", importer_pkg_id.path.to_owned()], hacking_workspace);
 }
 
 #[test]

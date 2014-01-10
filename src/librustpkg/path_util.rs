@@ -77,7 +77,7 @@ pub fn workspace_contains_crate_id_(crateid: &CrateId, workspace: &Path,
     let mut found = None;
     for p in fs::walk_dir(&src_dir) {
         if p.is_dir() {
-            if p == src_dir.join(&crateid.path) || {
+            if p == src_dir.join(crateid.path.as_slice()) || {
                 let pf = p.filename_str();
                 pf.iter().any(|&g| {
                     match split_version_general(g, '-') {
@@ -178,8 +178,8 @@ pub fn built_library_in_workspace(crateid: &CrateId, workspace: &Path) -> Option
 /// Does the actual searching stuff
 pub fn installed_library_in_workspace(crate_id: &CrateId, workspace: &Path) -> Option<Path> {
     // This could break once we're handling multiple versions better -- I should add a test for it
-    // FIXME (#9639): This needs to handle non-utf8 paths
-    match crate_id.path.filename_str() {
+    let path = Path::new(crate_id.path.as_slice());
+    match path.filename_str() {
         None => None,
         Some(_short_name) => library_in_workspace(crate_id, Install, workspace)
     }
@@ -192,7 +192,7 @@ pub fn library_in_workspace(crate_id: &CrateId, where: Target, workspace: &Path)
            crate_id.name);
 
     let dir_to_search = match where {
-        Build => target_build_dir(workspace).join(crate_id.path.clone()),
+        Build => target_build_dir(workspace).join(crate_id.path.as_slice()),
         Install => target_lib_dir(workspace)
     };
 
@@ -268,7 +268,7 @@ fn target_file_in_workspace(crateid: &CrateId, workspace: &Path,
     // Artifacts in the build directory live in a package-ID-specific subdirectory,
     // but installed ones don't.
     let result = match (where, what) {
-                (Build, _)      => target_build_dir(workspace).join(&crateid.path),
+                (Build, _)      => target_build_dir(workspace).join(crateid.path.as_slice()),
                 (Install, Lib)  => target_lib_dir(workspace),
                 (Install, _)    => target_bin_dir(workspace)
     };
@@ -284,7 +284,7 @@ fn target_file_in_workspace(crateid: &CrateId, workspace: &Path,
 /// Creates it if it doesn't exist.
 pub fn build_pkg_id_in_workspace(crateid: &CrateId, workspace: &Path) -> Path {
     let mut result = target_build_dir(workspace);
-    result.push(&crateid.path);
+    result.push(crateid.path.as_slice());
     debug!("Creating build dir {} for package id {}", result.display(),
            crateid.to_str());
     fs::mkdir_recursive(&result, io::UserRWX);
@@ -302,7 +302,7 @@ pub fn mk_output_path(what: OutputType, where: Target,
         // If we're installing, it just goes under <workspace>...
         Install => workspace,
         // and if we're just building, it goes in a package-specific subdir
-        Build => workspace.join(&crate_id.path)
+        Build => workspace.join(crate_id.path.as_slice())
     };
     debug!("[{:?}:{:?}] mk_output_path: name = {}, path = {}", what, where,
            if what == Lib { short_name_with_version.clone() } else { crate_id.name.clone() },
@@ -358,11 +358,12 @@ fn dir_has_file(dir: &Path, file: &str) -> bool {
 
 pub fn find_dir_using_rust_path_hack(p: &CrateId) -> Option<Path> {
     let rp = rust_path();
+    let path = Path::new(p.path.as_slice());
     for dir in rp.iter() {
         // Require that the parent directory match the package ID
         // Note that this only matches if the package ID being searched for
         // has a name that's a single component
-        if dir.ends_with_path(&p.path) || dir.ends_with_path(&versionize(&p.path, &p.version)) {
+        if dir.ends_with_path(&path) || dir.ends_with_path(&versionize(p.path, &p.version)) {
             debug!("In find_dir_using_rust_path_hack: checking dir {}", dir.display());
             if dir_has_crate_file(dir) {
                 debug!("Did find id {} in dir {}", p.to_str(), dir.display());
@@ -384,7 +385,8 @@ pub fn user_set_rust_path() -> bool {
 }
 
 /// Append the version string onto the end of the path's filename
-pub fn versionize(p: &Path, v: &Version) -> Path {
+pub fn versionize(p: &str, v: &Version) -> Path {
+    let p = Path::new(p);
     let q = p.filename().expect("path is a directory");
     let mut q = q.to_owned();
     q.push('-' as u8);
