@@ -83,7 +83,7 @@ pub fn workspace_contains_crate_id_(crateid: &CrateId, workspace: &Path,
                     match split_version_general(g, '-') {
                         None => false,
                         Some((ref might_match, ref vers)) => {
-                            *might_match == crateid.short_name
+                            *might_match == crateid.name
                                 && (crateid.version == *vers || crateid.version == None)
                         }
                     }
@@ -186,10 +186,10 @@ pub fn installed_library_in_workspace(crate_id: &CrateId, workspace: &Path) -> O
 }
 
 /// `workspace` is used to figure out the directory to search.
-/// `short_name` is taken as the link name of the library.
+/// `name` is taken as the link name of the library.
 pub fn library_in_workspace(crate_id: &CrateId, where: Target, workspace: &Path) -> Option<Path> {
     debug!("library_in_workspace: checking whether a library named {} exists",
-           crate_id.short_name);
+           crate_id.name);
 
     let dir_to_search = match where {
         Build => target_build_dir(workspace).join(crate_id.path.clone()),
@@ -212,7 +212,7 @@ fn library_in(crate_id: &CrateId, dir_to_search: &Path) -> Option<Path> {
     let path = dir_to_search.join(filename);
     if !path.exists() {
         debug!("warning: library_in_workspace didn't find a library in {} for {}",
-                  dir_to_search.display(), crate_id.short_name);
+                  dir_to_search.display(), crate_id.name);
         return None;
     } else {
         debug!("found: {}", path.display());
@@ -294,24 +294,24 @@ pub fn build_pkg_id_in_workspace(crateid: &CrateId, workspace: &Path) -> Path {
 /// Return the output file for a given directory name,
 /// given whether we're building a library and whether we're building tests
 pub fn mk_output_path(what: OutputType, where: Target,
-                      pkg_id: &CrateId, workspace: Path) -> Path {
-    let short_name_with_version = pkg_id.short_name_with_version();
+                      crate_id: &CrateId, workspace: Path) -> Path {
+    let short_name_with_version = crate_id.short_name_with_version();
     // Not local_path.dir_path()! For package foo/bar/blat/, we want
     // the executable blat-0.5 to live under blat/
     let dir = match where {
         // If we're installing, it just goes under <workspace>...
         Install => workspace,
         // and if we're just building, it goes in a package-specific subdir
-        Build => workspace.join(&pkg_id.path)
+        Build => workspace.join(&crate_id.path)
     };
-    debug!("[{:?}:{:?}] mk_output_path: short_name = {}, path = {}", what, where,
-           if what == Lib { short_name_with_version.clone() } else { pkg_id.short_name.clone() },
+    debug!("[{:?}:{:?}] mk_output_path: name = {}, path = {}", what, where,
+           if what == Lib { short_name_with_version.clone() } else { crate_id.name.clone() },
            dir.display());
     let mut output_path = match what {
         // this code is duplicated from elsewhere; fix this
         Lib => dir.join(os::dll_filename(short_name_with_version)),
         // executable names *aren't* versioned
-        _ => dir.join(format!("{}{}{}", pkg_id.short_name,
+        _ => dir.join(format!("{}{}{}", crate_id.name,
                            match what {
                                Test => "test",
                                Bench => "bench",

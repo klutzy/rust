@@ -61,7 +61,7 @@ fn fake_pkg() -> CrateId {
     let sn = ~"bogus";
     CrateId {
         path: Path::new(sn.as_slice()),
-        short_name: sn,
+        name: sn,
         version: None
     }
 }
@@ -69,7 +69,7 @@ fn fake_pkg() -> CrateId {
 fn git_repo_pkg() -> CrateId {
     CrateId {
         path: Path::new("mockgithub.com/catamorphism/test-pkg"),
-        short_name: ~"test-pkg",
+        name: ~"test-pkg",
         version: None
     }
 }
@@ -327,7 +327,7 @@ fn create_local_package_with_dep(crateid: &CrateId, subord_crateid: &CrateId) ->
     // Write a main.rs file into crateid that references subord_crateid
     writeFile(&package_dir.path().join_many([~"src", crateid.to_str(), ~"main.rs"]),
               format!("extern mod {};\nfn main() \\{\\}",
-                   subord_crateid.short_name));
+                   subord_crateid.name));
     // Write a lib.rs file into subord_crateid that has something in it
     writeFile(&package_dir.path().join_many([~"src", subord_crateid.to_str(), ~"lib.rs"]),
               "pub fn f() {}");
@@ -374,7 +374,7 @@ fn test_executable_exists(repo: &Path, short_name: &str) -> bool {
 }
 
 fn remove_executable_file(p: &CrateId, workspace: &Path) {
-    let exec = target_executable_in_workspace(&CrateId::new(p.short_name), workspace);
+    let exec = target_executable_in_workspace(&CrateId::new(p.name), workspace);
     if exec.exists() {
         fs::unlink(&exec);
     }
@@ -395,7 +395,7 @@ fn built_executable_exists(repo: &Path, short_name: &str) -> bool {
 }
 
 fn remove_built_executable_file(p: &CrateId, workspace: &Path) {
-    let exec = built_executable_in_workspace(&CrateId::new(p.short_name), workspace);
+    let exec = built_executable_in_workspace(p, workspace);
     match exec {
         Some(r) => fs::unlink(&r),
         None    => ()
@@ -1954,7 +1954,7 @@ fn install_after_build() {
     let workspace = workspace.path();
     command_line_test([~"build", ~"b"], workspace);
     command_line_test([~"install", ~"b"], workspace);
-    assert_executable_exists(workspace, b_id.short_name);
+    assert_executable_exists(workspace, b_id.name);
     assert_lib_exists(workspace, &b_id);
 }
 
@@ -1966,25 +1966,25 @@ fn reinstall() {
     // 1. Install, then remove executable file, then install again,
     // and make sure executable was re-installed
     command_line_test([~"install", ~"b"], workspace);
-    assert_executable_exists(workspace, b.short_name);
+    assert_executable_exists(workspace, b.name);
     assert_lib_exists(workspace, &b);
     remove_executable_file(&b, workspace);
     command_line_test([~"install", ~"b"], workspace);
-    assert_executable_exists(workspace, b.short_name);
+    assert_executable_exists(workspace, b.name);
     // 2. Build, then remove build executable file, then build again,
     // and make sure executable was re-built.
     command_line_test([~"build", ~"b"], workspace);
     remove_built_executable_file(&b, workspace);
     command_line_test([~"build", ~"b"], workspace);
-    assert_built_executable_exists(workspace, b.short_name);
+    assert_built_executable_exists(workspace, b.name);
     // 3. Install, then remove both executable and built executable,
     // then install again, make sure both were recreated
     command_line_test([~"install", ~"b"], workspace);
     remove_executable_file(&b, workspace);
     remove_built_executable_file(&b, workspace);
     command_line_test([~"install", ~"b"], workspace);
-    assert_executable_exists(workspace, b.short_name);
-    assert_built_executable_exists(workspace, b.short_name);
+    assert_executable_exists(workspace, b.name);
+    assert_built_executable_exists(workspace, b.name);
 }
 
 #[test]

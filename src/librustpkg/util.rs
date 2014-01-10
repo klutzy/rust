@@ -425,7 +425,7 @@ pub fn compile_crate(ctxt: &BuildContext,
                      opt: session::OptLevel,
                      what: OutputType) -> Option<Path> {
     debug!("compile_crate: crate={}, workspace={}", crate.display(), workspace.display());
-    debug!("compile_crate: short_name = {}, flags =...", crate_id.to_str());
+    debug!("compile_crate: name = {}, flags =...", crate_id.to_str());
     for fl in flags.iter() {
         debug!("+++ {}", *fl);
     }

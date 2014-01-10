@@ -29,7 +29,7 @@ pub struct CrateId {
     /// The short name does not need to be a valid Rust identifier.
     /// Users can write: `extern mod foo = "...";` to get around the issue
     /// of package IDs whose short names aren't valid Rust identifiers.
-    short_name: ~str,
+    name: ~str,
     /// The requested package version.
     version: Option<~str>
 }
@@ -68,11 +68,11 @@ impl CrateId {
         if path.filename().is_none() {
             return cond.raise((path, ~"0-length crate_id"));
         }
-        let short_name = path.filestem_str().expect(format!("Strange path! {}", s));
+        let name = path.filestem_str().expect(format!("Strange path! {}", s));
 
         CrateId {
             path: path.clone(),
-            short_name: short_name.to_owned(),
+            name: name.to_owned(),
             version: version
         }
     }
@@ -82,7 +82,7 @@ impl CrateId {
     }
 
     pub fn to_lib_name(&self) -> ~str {
-        format!("{}-{}-{}", self.short_name, self.hash(), self.version_or_default())
+        format!("{}-{}-{}", self.name, self.hash(), self.version_or_default())
     }
 
     pub fn hash(&self) -> ~str {
@@ -94,12 +94,12 @@ impl CrateId {
     }
 
     pub fn short_name_with_version(&self) -> ~str {
-        format!("{}-{}", self.short_name, self.version_or_default())
+        format!("{}-{}", self.name, self.version_or_default())
     }
 
     /// True if the ID has multiple components
     pub fn is_complex(&self) -> bool {
-        self.short_name.as_bytes() != self.path.as_vec()
+        self.name.as_bytes() != self.path.as_vec()
     }
 
     pub fn prefixes(&self) -> Prefixes {

@@ -345,7 +345,7 @@ impl PkgSrc {
         use conditions::missing_pkg_files::cond;
 
         let prefix = self.start_dir.components().len();
-        debug!("Matching against {}", self.id.short_name);
+        debug!("Matching against {}", self.id.name);
         for pth in fs::walk_dir(&self.start_dir) {
             let maybe_known_crate_set = match pth.filename_str() {
                 Some(filename) if filter(filename) => match filename {
