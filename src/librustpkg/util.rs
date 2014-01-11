@@ -10,13 +10,17 @@
 
 #[allow(dead_code)];
 
+pub use target::{OutputType, Main, Lib, Bench, Test, JustOne, lib_name_of, lib_crate_filename};
+pub use target::{Target, Build, Install};
+pub use target::{lib_name_of, lib_crate_filename, WhatToBuild, MaybeCustom, Inferred};
+
 use std::cell::RefCell;
 use std::libc;
 use std::os;
 use std::io;
 use std::io::fs;
 use extra::workcache;
-use rustc::driver::{driver, session};
+use extra::treemap::TreeMap;
 use extra::getopts::groups::getopts;
 use syntax;
 use syntax::codemap::{DUMMY_SP, Spanned};
@@ -26,19 +30,16 @@ use syntax::attr::AttrMetaMethods;
 use syntax::fold::Folder;
 use syntax::visit::Visitor;
 use syntax::util::small_vector::SmallVector;
+use syntax::crateid::CrateId;
 use rustc::back::link::OutputTypeExe;
 use rustc::back::link;
+use rustc::driver::{driver, session};
 use CtxMethods;
 use context::{in_target, StopBefore, Link, Assemble, BuildContext};
-use crate_id::CrateId;
 use package_source::PkgSrc;
 use workspace::pkg_parent_workspaces;
 use path_util::{system_library, target_build_dir};
 use path_util::{default_workspace, built_library_in_workspace};
-pub use target::{OutputType, Main, Lib, Bench, Test, JustOne, lib_name_of, lib_crate_filename};
-pub use target::{Target, Build, Install};
-use extra::treemap::TreeMap;
-pub use target::{lib_name_of, lib_crate_filename, WhatToBuild, MaybeCustom, Inferred};
 use workcache_support::{digest_file_with_date, digest_only_date};
 use messages::error;
 

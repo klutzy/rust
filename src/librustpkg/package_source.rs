@@ -11,7 +11,6 @@
 extern mod extra;
 
 use target::*;
-use crate_id::CrateId;
 use std::io;
 use std::io::fs;
 use std::os;
@@ -27,7 +26,7 @@ use workcache_support;
 use workcache_support::{digest_only_date, digest_file_with_date, crate_tag};
 use extra::workcache;
 use extra::treemap::TreeMap;
-
+use syntax::crateid::CrateId;
 use rustc::driver::session;
 
 // An enumeration of the unpacked source of a package workspace.

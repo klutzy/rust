@@ -11,7 +11,6 @@
 use CtxMethods;
 use context::*;
 use crate::*;
-use crate_id::CrateId;
 use package_source::*;
 use path_util::{platform_library_name, target_build_dir};
 use target::*;
@@ -26,6 +25,7 @@ use extra::arc::{Arc,RWArc};
 use extra::workcache;
 use extra::workcache::{Database, FreshnessMap};
 use extra::treemap::TreeMap;
+use syntax::crateid::CrateId;
 
 // A little sad -- duplicated from rustc::back::*
 #[cfg(target_arch = "arm")]

@@ -32,6 +32,7 @@ use rustc::metadata::filesearch;
 use rustc::metadata::filesearch::rust_path;
 use rustc::util::sha2;
 use syntax::{ast, diagnostic};
+use syntax::crateid::CrateId;
 use messages::{error, warn, note};
 use parse_args::{ParseResult, parse_args};
 use path_util::{build_pkg_id_in_workspace, built_test_in_workspace};
@@ -45,7 +46,6 @@ use context::{BuildContext, Trans, Nothing, Pretty, Analysis,
               LLVMAssemble, LLVMCompileBitcode};
 use context::{Command, BuildCmd, CleanCmd, DoCmd, InfoCmd, InstallCmd, ListCmd,
     PreferCmd, TestCmd, InitCmd, UninstallCmd, UnpreferCmd};
-use crate_id::CrateId;
 use package_source::PkgSrc;
 use target::{WhatToBuild, Everything, is_lib, is_main, is_test, is_bench};
 use target::{Main, Tests, MaybeCustom, Inferred, JustOne};
@@ -59,7 +59,6 @@ mod crate;
 pub mod exit_codes;
 mod installed_packages;
 mod messages;
-pub mod crate_id;
 pub mod package_source;
 mod parse_args;
 mod path_util;

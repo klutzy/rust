@@ -93,6 +93,10 @@ impl CrateId {
             Some(ref version) => version.as_slice(),
         }
     }
+
+    pub fn short_name_with_version(&self) -> ~str {
+        format!("{}-{}", self.name, self.version_or_default())
+    }
 }
 
 #[test]

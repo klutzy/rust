@@ -12,7 +12,6 @@
 
 #[allow(dead_code)];
 
-pub use crate_id::CrateId;
 pub use target::{OutputType, Main, Lib, Test, Bench, Target, Build, Install};
 pub use version::{Version, split_version, split_version_general, try_parsing_version};
 pub use rustc::metadata::filesearch::rust_path;
@@ -22,6 +21,9 @@ use std::libc::consts::os::posix88::{S_IRUSR, S_IWUSR, S_IXUSR};
 use std::os;
 use std::io;
 use std::io::fs;
+use extra::hex::ToHex;
+use syntax::crateid::CrateId;
+use rustc::util::sha2::{Digest, Sha256};
 use rustc::metadata::filesearch::libdir;
 use rustc::driver::driver::host_triple;
 use messages::*;
@@ -205,7 +207,13 @@ pub fn system_library(sysroot: &Path, crate_id: &CrateId) -> Option<Path> {
 }
 
 fn library_in(crate_id: &CrateId, dir_to_search: &Path) -> Option<Path> {
-    let lib_name = crate_id.to_lib_name();
+    let mut hasher = Sha256::new();
+    hasher.reset();
+    hasher.input_str(crate_id.to_str());
+    let hash = hasher.result_bytes().to_hex();
+    let hash = hash.slice_chars(0, 8);
+
+    let lib_name = format!("{}-{}-{}", crate_id.name, hash, crate_id.version_or_default());
     let filename = format!("{}{}{}", os::consts::DLL_PREFIX, lib_name, os::consts::DLL_SUFFIX);
     debug!("filename = {}", filename);
 

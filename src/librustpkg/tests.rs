@@ -25,7 +25,7 @@ use extra::treemap::TreeMap;
 use extra::getopts::groups::getopts;
 use std::run::ProcessOutput;
 use installed_packages::list_installed_packages;
-use crate_id::CrateId;
+use syntax::crateid::CrateId;
 use path_util::{target_executable_in_workspace, target_test_in_workspace,
                target_bench_in_workspace, make_dir_rwx,
                library_in_workspace, installed_library_in_workspace,

@@ -10,10 +10,10 @@
 
 // Useful conditions
 
-pub use crate_id::CrateId;
-pub use std::io::FileStat;
-pub use std::io::process::ProcessExit;
-pub use std::path::Path;
+use syntax::crateid::CrateId;
+use std::io::FileStat;
+use std::io::process::ProcessExit;
+use std::path::Path;
 
 condition! {
     pub bad_path: (Path, ~str) -> Path;

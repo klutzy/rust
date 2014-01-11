@@ -15,7 +15,7 @@ use context::Context;
 use path_util::{workspace_contains_crate_id, find_dir_using_rust_path_hack, default_workspace};
 use path_util::rust_path;
 use util::option_to_vec;
-use crate_id::CrateId;
+use syntax::crateid::CrateId;
 
 pub fn each_pkg_parent_workspace(cx: &Context,
                                  crateid: &CrateId,
