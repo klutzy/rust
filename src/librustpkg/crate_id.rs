@@ -15,7 +15,7 @@ use rustc::util::sha2::{Digest, Sha256};
 /// Path-fragment identifier of a package such as
 /// 'github.com/graydon/test'; path must be a relative
 /// path with >=1 component.
-#[deriving(Clone)]
+#[deriving(Clone, Eq)]
 pub struct CrateId {
     /// This is a path, on the local filesystem, referring to where the
     /// files for this package live. For example:
@@ -34,9 +34,17 @@ pub struct CrateId {
     version: Option<~str>
 }
 
-impl Eq for CrateId {
-    fn eq(&self, other: &CrateId) -> bool {
-        self.path == other.path && self.version == other.version
+impl ToStr for CrateId {
+    fn to_str(&self) -> ~str {
+        let version = match self.version {
+            None => "0.0",
+            Some(ref version) => version.as_slice(),
+        };
+        if self.path == self.name || self.path.ends_with(format!("/{}", self.name)) {
+            format!("{}\\#{}", self.path, version)
+        } else {
+            format!("{}\\#{}:{}", self.path, self.name, version)
+        }
     }
 }
 
@@ -77,10 +85,6 @@ impl CrateId {
         }
     }
 
-    pub fn to_crate_id_str(&self) -> ~str {
-        format!("{}\\#{}", self.path, self.version_or_default())
-    }
-
     pub fn to_lib_name(&self) -> ~str {
         format!("{}-{}-{}", self.name, self.hash(), self.version_or_default())
     }
@@ -88,7 +92,7 @@ impl CrateId {
     pub fn hash(&self) -> ~str {
         let mut hasher = Sha256::new();
         hasher.reset();
-        hasher.input_str(self.to_crate_id_str());
+        hasher.input_str(self.to_str());
         let hash = hasher.result_bytes().to_hex();
         hash.slice_chars(0, 8).to_owned()
     }

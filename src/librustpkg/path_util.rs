@@ -96,9 +96,9 @@ pub fn workspace_contains_crate_id_(crateid: &CrateId, workspace: &Path,
     }
 
     if found.is_some() {
-        debug!("Found {} in {}", crateid.to_crate_id_str(), workspace.display());
+        debug!("Found {} in {}", crateid.to_str(), workspace.display());
     } else {
-        debug!("Didn't find {} in {}", crateid.to_crate_id_str(), workspace.display());
+        debug!("Didn't find {} in {}", crateid.to_str(), workspace.display());
     }
     found
 }
@@ -275,7 +275,7 @@ fn target_file_in_workspace(crateid: &CrateId, workspace: &Path,
     if io::result(|| fs::mkdir_recursive(&result, io::UserRWX)).is_err() {
         cond.raise((result.clone(), format!("target_file_in_workspace couldn't \
             create the {} dir (crateid={}, workspace={}, what={:?}, where={:?}",
-            subdir, crateid.to_crate_id_str(), workspace.display(), what, where)));
+            subdir, crateid.to_str(), workspace.display(), what, where)));
     }
     mk_output_path(what, where, crateid, result)
 }
@@ -286,7 +286,7 @@ pub fn build_pkg_id_in_workspace(crateid: &CrateId, workspace: &Path) -> Path {
     let mut result = target_build_dir(workspace);
     result.push(crateid.path.as_slice());
     debug!("Creating build dir {} for package id {}", result.display(),
-           crateid.to_crate_id_str());
+           crateid.to_str());
     fs::mkdir_recursive(&result, io::UserRWX);
     return result;
 }
@@ -341,7 +341,7 @@ pub fn uninstall_package_from(workspace: &Path, crateid: &CrateId) {
     }
     if !did_something {
         warn(format!("Warning: there don't seem to be any files for {} installed in {}",
-             crateid.to_crate_id_str(), workspace.display()));
+             crateid.to_str(), workspace.display()));
     }
 
 }
@@ -366,11 +366,11 @@ pub fn find_dir_using_rust_path_hack(p: &CrateId) -> Option<Path> {
         if dir.ends_with_path(&path) || dir.ends_with_path(&versionize(p.path, &p.version)) {
             debug!("In find_dir_using_rust_path_hack: checking dir {}", dir.display());
             if dir_has_crate_file(dir) {
-                debug!("Did find id {} in dir {}", p.to_crate_id_str(), dir.display());
+                debug!("Did find id {} in dir {}", p.to_str(), dir.display());
                 return Some(dir.clone());
             }
         }
-        debug!("Didn't find id {} in dir {}", p.to_crate_id_str(), dir.display())
+        debug!("Didn't find id {} in dir {}", p.to_str(), dir.display())
     }
     None
 }

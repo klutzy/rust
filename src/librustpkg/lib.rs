@@ -121,7 +121,7 @@ impl<'a> PkgScript<'a> {
         let crate_and_map = driver::phase_2_configure_and_expand(sess, cfg.clone(), crate);
         let work_dir = build_pkg_id_in_workspace(id, workspace);
 
-        debug!("Returning package script with id {}", id.to_crate_id_str());
+        debug!("Returning package script with id {}", id.to_str());
 
         PkgScript {
             id: id,
@@ -268,7 +268,7 @@ impl CtxMethods for BuildContext {
             let mut dest_ws = default_workspace();
             each_pkg_parent_workspace(&self.context, &crateid, |workspace| {
                 debug!("found pkg {} in workspace {}, trying to build",
-                       crateid.to_crate_id_str(), workspace.display());
+                       crateid.to_str(), workspace.display());
                 dest_ws = determine_destination(os::getcwd(),
                                                 self.context.use_rust_path_hack,
                                                 workspace);
@@ -343,7 +343,7 @@ impl CtxMethods for BuildContext {
                     let crateid = CrateId::new(args[0]);
                     let workspaces = pkg_parent_workspaces(&self.context, &crateid);
                     debug!("package ID = {}, found it in {:?} workspaces",
-                           crateid.to_crate_id_str(), workspaces.len());
+                           crateid.to_str(), workspaces.len());
                     if workspaces.is_empty() {
                         let d = default_workspace();
                         let src = PkgSrc::new(d.clone(), d, false, crateid.clone());
@@ -415,7 +415,7 @@ impl CtxMethods for BuildContext {
                     each_pkg_parent_workspace(&self.context, &crateid, |workspace| {
                         path_util::uninstall_package_from(workspace, &crateid);
                         note(format!("Uninstalled package {} (was installed in {})",
-                                  crateid.to_crate_id_str(), workspace.display()));
+                                  crateid.to_str(), workspace.display()));
                         true
                     });
                 }
@@ -445,7 +445,7 @@ impl CtxMethods for BuildContext {
         debug!("build: workspace = {} (in Rust path? {:?} is git dir? {:?} \
                 crateid = {} pkgsrc start_dir = {}", workspace.display(),
                in_rust_path(&workspace), is_git_dir(&workspace.join(path)),
-               crateid.to_crate_id_str(), pkg_src.start_dir.display());
+               crateid.to_str(), pkg_src.start_dir.display());
         debug!("build: what to build = {:?}", what_to_build);
 
         // If workspace isn't in the RUST_PATH, and it's a git repo,
@@ -462,7 +462,7 @@ impl CtxMethods for BuildContext {
             };
             let default_ws = default_workspace();
             debug!("Calling build recursively with {:?} and {:?}", default_ws.display(),
-                   crateid.to_crate_id_str());
+                   crateid.to_str());
             return self.build(&mut PkgSrc::new(default_ws.clone(),
                                                default_ws,
                                                false,
@@ -559,13 +559,13 @@ impl CtxMethods for BuildContext {
 
         let dir = build_pkg_id_in_workspace(id, workspace);
         note(format!("Cleaning package {} (removing directory {})",
-                        id.to_crate_id_str(), dir.display()));
+                        id.to_str(), dir.display()));
         if dir.exists() {
             fs::rmdir_recursive(&dir);
             note(format!("Removed directory {}", dir.display()));
         }
 
-        note(format!("Cleaned package {}", id.to_crate_id_str()));
+        note(format!("Cleaned package {}", id.to_str()));
     }
 
     fn info(&self) {
@@ -591,7 +591,7 @@ impl CtxMethods for BuildContext {
 
         let to_do = ~[pkg_src.libs.clone(), pkg_src.mains.clone(),
                       pkg_src.tests.clone(), pkg_src.benchs.clone()];
-        debug!("In declare inputs for {}", id.to_crate_id_str());
+        debug!("In declare inputs for {}", id.to_str());
         for cs in to_do.iter() {
             for c in cs.iter() {
                 let path = pkg_src.start_dir.join(&c.file);
@@ -608,7 +608,7 @@ impl CtxMethods for BuildContext {
                                            &id).map(|s| Path::new(s.as_slice()));
         installed_files = installed_files + result;
         note(format!("Installed package {} to {}",
-                     id.to_crate_id_str(),
+                     id.to_str(),
                      pkg_src.destination_workspace.display()));
         (installed_files, inputs)
     }
@@ -621,7 +621,7 @@ impl CtxMethods for BuildContext {
                         id: &CrateId) -> ~[~str] {
 
         debug!("install_no_build: assuming {} comes from {} with target {}",
-               id.to_crate_id_str(), build_workspace.display(), target_workspace.display());
+               id.to_str(), build_workspace.display(), target_workspace.display());
 
         // Now copy stuff into the install dirs
         let maybe_executable = built_executable_in_workspace(id, build_workspace);
@@ -725,7 +725,7 @@ impl CtxMethods for BuildContext {
             None => {
                 error(format!("Internal error: test executable for package ID {} in workspace {} \
                            wasn't built! Please report this as a bug.",
-                           crateid.to_crate_id_str(), workspace.display()));
+                           crateid.to_str(), workspace.display()));
             }
         }
     }

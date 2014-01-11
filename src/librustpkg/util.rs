@@ -53,7 +53,7 @@ pub struct Pkg {
 
 impl ToStr for Pkg {
     fn to_str(&self) -> ~str {
-        self.id.to_crate_id_str()
+        self.id.to_str()
     }
 }
 
@@ -296,7 +296,7 @@ pub fn compile_input(context: &BuildContext,
     if !attr::contains_name(crate.attrs, "crate_id") {
         // FIXME (#9639): This needs to handle non-utf8 paths
         let crateid_attr =
-            attr::mk_name_value_item_str(@"crate_id", crate_id.to_crate_id_str().to_managed());
+            attr::mk_name_value_item_str(@"crate_id", crate_id.to_str().to_managed());
 
         debug!("crateid attr: {:?}", crateid_attr);
         crate.attrs.push(attr::mk_attr(crateid_attr));
@@ -425,7 +425,7 @@ pub fn compile_crate(ctxt: &BuildContext,
                      opt: session::OptLevel,
                      what: OutputType) -> Option<Path> {
     debug!("compile_crate: crate={}, workspace={}", crate.display(), workspace.display());
-    debug!("compile_crate: name = {}, flags =...", crate_id.to_crate_id_str());
+    debug!("compile_crate: name = {}, flags =...", crate_id.to_str());
     for fl in flags.iter() {
         debug!("+++ {}", *fl);
     }

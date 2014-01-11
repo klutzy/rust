@@ -289,7 +289,7 @@ fn command_line_test_with_env(args: &[~str], cwd: &Path, env: Option<~[(~str, ~s
 
 fn create_local_package(crateid: &CrateId) -> TempDir {
     let (workspace, parent_dir) = mk_temp_workspace(crateid);
-    debug!("Created empty package dir for {}, returning {}", crateid.to_crate_id_str(),
+    debug!("Created empty package dir for {}, returning {}", crateid.to_str(),
            parent_dir.display());
     workspace
 }
@@ -340,7 +340,7 @@ fn create_local_package_with_dep(crateid: &CrateId, subord_crateid: &CrateId) ->
 fn create_local_package_with_custom_build_hook(crateid: &CrateId,
                                                custom_build_hook: &str) -> TempDir {
     debug!("Dry run -- would create package {} with custom build hook {}",
-           crateid.to_crate_id_str(), custom_build_hook);
+           crateid.to_str(), custom_build_hook);
     create_local_package(crateid)
     // actually write the pkg.rs with the custom build hook
 
@@ -351,7 +351,7 @@ fn assert_lib_exists(repo: &Path, crate_id: &CrateId) {
 }
 
 fn lib_exists(repo: &Path, crate_id: &CrateId) -> bool {
-    debug!("assert_lib_exists: repo = {}, crate_id = {}", repo.display(), crate_id.to_crate_id_str());
+    debug!("assert_lib_exists: repo = {}, crate_id = {}", repo.display(), crate_id.to_str());
     let lib = installed_library_in_workspace(crate_id, repo);
     debug!("assert_lib_exists: checking whether {:?} exists", lib);
     lib.is_some() && {
@@ -720,9 +720,9 @@ fn test_crate_ids_must_be_relative_path_like() {
 
     let whatever = CrateId::new("foo");
 
-    assert_eq!(~"foo#0.0", whatever.to_crate_id_str());
+    assert_eq!(~"foo#0.0", whatever.to_str());
     assert!("github.com/catamorphism/test-pkg#0.0" ==
-            CrateId::new("github.com/catamorphism/test-pkg").to_crate_id_str());
+            CrateId::new("github.com/catamorphism/test-pkg").to_str());
 
     cond.trap(|(p, e)| {
         assert!(p.filename().is_none())
@@ -730,7 +730,7 @@ fn test_crate_ids_must_be_relative_path_like() {
         whatever.clone()
     }).inside(|| {
         let x = CrateId::new("");
-        assert_eq!(~"foo#0.0", x.to_crate_id_str());
+        assert_eq!(~"foo#0.0", x.to_str());
     });
 
     cond.trap(|(p, e)| {
@@ -742,7 +742,7 @@ fn test_crate_ids_must_be_relative_path_like() {
         let zp = os::make_absolute(&Path::new("foo/bar/quux"));
         // FIXME (#9639): This needs to handle non-utf8 paths
         let z = CrateId::new(zp.as_str().unwrap());
-        assert_eq!(~"foo#0.0", z.to_crate_id_str());
+        assert_eq!(~"foo#0.0", z.to_str());
     })
 }
 
