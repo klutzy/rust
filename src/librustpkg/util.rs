@@ -53,7 +53,7 @@ pub struct Pkg {
 
 impl ToStr for Pkg {
     fn to_str(&self) -> ~str {
-        self.id.to_str()
+        self.id.to_crate_id_str()
     }
 }
 
@@ -425,7 +425,7 @@ pub fn compile_crate(ctxt: &BuildContext,
                      opt: session::OptLevel,
                      what: OutputType) -> Option<Path> {
     debug!("compile_crate: crate={}, workspace={}", crate.display(), workspace.display());
-    debug!("compile_crate: name = {}, flags =...", crate_id.to_str());
+    debug!("compile_crate: name = {}, flags =...", crate_id.to_crate_id_str());
     for fl in flags.iter() {
         debug!("+++ {}", *fl);
     }

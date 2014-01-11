@@ -61,7 +61,7 @@ pub enum BuildSort { InPlace, Discovered }
 impl ToStr for PkgSrc {
     fn to_str(&self) -> ~str {
         format!("Package ID {} in start dir {} [workspaces = {} -> {}]",
-                self.id.to_str(),
+                self.id.to_crate_id_str(),
                 self.start_dir.display(),
                 self.source_workspace.display(),
                 self.destination_workspace.display())
@@ -82,7 +82,7 @@ impl PkgSrc {
 
         debug!("Checking package source for package ID {}, \
                 workspace = {} -> {}, use_rust_path_hack = {:?}",
-                id.to_str(),
+                id.to_crate_id_str(),
                 source_workspace.display(),
                 destination_workspace.display(),
                 use_rust_path_hack);
@@ -241,7 +241,7 @@ impl PkgSrc {
         debug!("3. build_in_destination = {:?}", build_in_destination);
         debug!("source: {} dest: {}", source_workspace.display(), destination_workspace.display());
 
-        debug!("For package id {}, returning {}", id.to_str(), dir.display());
+        debug!("For package id {}, returning {}", id.to_crate_id_str(), dir.display());
 
         if !dir.is_dir() {
             cond.raise((id.clone(), ~"supplied path for package dir is a \
@@ -272,7 +272,7 @@ impl PkgSrc {
         let cwd = os::getcwd();
         let path = Path::new(crateid.path.as_slice());
         debug!("Checking whether {} (path = {}) exists locally. Cwd = {}, does it? {:?}",
-                crateid.to_str(), crateid.path,
+                crateid.to_crate_id_str(), crateid.path,
                 cwd.display(),
                 path.exists());
 

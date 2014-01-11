@@ -156,10 +156,10 @@ pub fn build_library_in_workspace(exec: &mut workcache::Exec,
     let out_name = workspace_build_dir.join_many([package_name.to_str(),
                                                   platform_library_name(output)]);
     // make paths absolute
-    let crateid = CrateId::new(package_name);
+    let crateid = CrateId::new(package_name); // crateid.path == crateid.name
     let absolute_paths = paths.map(|s| {
             let whatever = workspace.join_many([~"src",
-                                crateid.to_str(),
+                                crateid.short_name_with_version(),
                                 s.to_owned()]);
             whatever.as_str().unwrap().to_owned()
         });

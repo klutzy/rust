@@ -110,7 +110,7 @@ impl CrateId {
     // binaries for this package (as opposed to the built ones,
     // which are per-crate).
     pub fn install_tag(&self) -> ~str {
-        format!("install({})", self.to_str())
+        format!("install({}-{})", self.path, self.version_or_default())
     }
 }
 
@@ -139,13 +139,6 @@ impl Iterator<(Path, Path)> for Prefixes {
             Some((Path::new(self.components.connect("/")),
                   Path::new(self.remaining.connect("/"))))
         }
-    }
-}
-
-impl ToStr for CrateId {
-    fn to_str(&self) -> ~str {
-        // should probably use the filestem and not the whole path
-        format!("{}-{}", self.path, self.version_or_default())
     }
 }
 

@@ -289,14 +289,14 @@ fn command_line_test_with_env(args: &[~str], cwd: &Path, env: Option<~[(~str, ~s
 
 fn create_local_package(crateid: &CrateId) -> TempDir {
     let (workspace, parent_dir) = mk_temp_workspace(crateid);
-    debug!("Created empty package dir for {}, returning {}", crateid.to_str(),
+    debug!("Created empty package dir for {}, returning {}", crateid.to_crate_id_str(),
            parent_dir.display());
     workspace
 }
 
 fn create_local_package_in(crateid: &CrateId, pkgdir: &Path) -> Path {
 
-    let package_dir = pkgdir.join_many([~"src", crateid.to_str()]);
+    let package_dir = pkgdir.join_many([~"src", crateid.short_name_with_version()]);
 
     // Create main, lib, test, and bench files
     fs::mkdir_recursive(&package_dir, io::UserRWX);
@@ -324,11 +324,15 @@ fn create_local_package_with_dep(crateid: &CrateId, subord_crateid: &CrateId) ->
     let package_dir = create_local_package(crateid);
     create_local_package_in(subord_crateid, package_dir.path());
     // Write a main.rs file into crateid that references subord_crateid
-    writeFile(&package_dir.path().join_many([~"src", crateid.to_str(), ~"main.rs"]),
+    writeFile(&package_dir.path().join_many([~"src",
+                                             crateid.short_name_with_version(),
+                                             ~"main.rs"]),
               format!("extern mod {};\nfn main() \\{\\}",
                    subord_crateid.name));
     // Write a lib.rs file into subord_crateid that has something in it
-    writeFile(&package_dir.path().join_many([~"src", subord_crateid.to_str(), ~"lib.rs"]),
+    writeFile(&package_dir.path().join_many([~"src",
+                                             subord_crateid.short_name_with_version(),
+                                             ~"lib.rs"]),
               "pub fn f() {}");
     package_dir
 }
@@ -336,7 +340,7 @@ fn create_local_package_with_dep(crateid: &CrateId, subord_crateid: &CrateId) ->
 fn create_local_package_with_custom_build_hook(crateid: &CrateId,
                                                custom_build_hook: &str) -> TempDir {
     debug!("Dry run -- would create package {} with custom build hook {}",
-           crateid.to_str(), custom_build_hook);
+           crateid.to_crate_id_str(), custom_build_hook);
     create_local_package(crateid)
     // actually write the pkg.rs with the custom build hook
 
@@ -347,7 +351,7 @@ fn assert_lib_exists(repo: &Path, crate_id: &CrateId) {
 }
 
 fn lib_exists(repo: &Path, crate_id: &CrateId) -> bool {
-    debug!("assert_lib_exists: repo = {}, crate_id = {}", repo.display(), crate_id.to_str());
+    debug!("assert_lib_exists: repo = {}, crate_id = {}", repo.display(), crate_id.to_crate_id_str());
     let lib = installed_library_in_workspace(crate_id, repo);
     debug!("assert_lib_exists: checking whether {:?} exists", lib);
     lib.is_some() && {
@@ -472,7 +476,7 @@ fn lib_output_file_name(workspace: &Path, short_name: &str) -> Path {
 #[cfg(target_os = "linux")]
 fn touch_source_file(workspace: &Path, crateid: &CrateId) {
     use conditions::bad_path::cond;
-    let pkg_src_dir = workspace.join_many([~"src", crateid.to_str()]);
+    let pkg_src_dir = workspace.join_many([~"src", crateid.short_name_with_version()]);
     let contents = fs::readdir(&pkg_src_dir);
     for p in contents.iter() {
         if p.extension_str() == Some("rs") {
@@ -492,7 +496,7 @@ fn touch_source_file(workspace: &Path, crateid: &CrateId) {
 #[cfg(not(target_os = "linux"))]
 fn touch_source_file(workspace: &Path, crateid: &CrateId) {
     use conditions::bad_path::cond;
-    let pkg_src_dir = workspace.join_many([~"src", crateid.to_str()]);
+    let pkg_src_dir = workspace.join_many([~"src", crateid.short_name_with_version()]);
     let contents = fs::readdir(&pkg_src_dir);
     for p in contents.iter() {
         if p.extension_str() == Some("rs") {
@@ -511,7 +515,7 @@ fn touch_source_file(workspace: &Path, crateid: &CrateId) {
 /// Add a comment at the end
 fn frob_source_file(workspace: &Path, crateid: &CrateId, filename: &str) {
     use conditions::bad_path::cond;
-    let pkg_src_dir = workspace.join_many([~"src", crateid.to_str()]);
+    let pkg_src_dir = workspace.join_many([~"src", crateid.short_name_with_version()]);
     let mut maybe_p = None;
     let maybe_file = pkg_src_dir.join(filename);
     debug!("Trying to frob {} -- {}", pkg_src_dir.display(), filename);
@@ -716,9 +720,9 @@ fn test_crate_ids_must_be_relative_path_like() {
 
     let whatever = CrateId::new("foo");
 
-    assert_eq!(~"foo-0.0", whatever.to_str());
-    assert!("github.com/catamorphism/test-pkg-0.0" ==
-            CrateId::new("github.com/catamorphism/test-pkg").to_str());
+    assert_eq!(~"foo#0.0", whatever.to_crate_id_str());
+    assert!("github.com/catamorphism/test-pkg#0.0" ==
+            CrateId::new("github.com/catamorphism/test-pkg").to_crate_id_str());
 
     cond.trap(|(p, e)| {
         assert!(p.filename().is_none())
@@ -726,7 +730,7 @@ fn test_crate_ids_must_be_relative_path_like() {
         whatever.clone()
     }).inside(|| {
         let x = CrateId::new("");
-        assert_eq!(~"foo-0.0", x.to_str());
+        assert_eq!(~"foo#0.0", x.to_crate_id_str());
     });
 
     cond.trap(|(p, e)| {
@@ -738,7 +742,7 @@ fn test_crate_ids_must_be_relative_path_like() {
         let zp = os::make_absolute(&Path::new("foo/bar/quux"));
         // FIXME (#9639): This needs to handle non-utf8 paths
         let z = CrateId::new(zp.as_str().unwrap());
-        assert_eq!(~"foo-0.0", z.to_str());
+        assert_eq!(~"foo#0.0", z.to_crate_id_str());
     })
 }
 
