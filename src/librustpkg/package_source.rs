@@ -68,12 +68,38 @@ impl ToStr for PkgSrc {
     }
 }
 condition! {
-    // #6009: should this be pub or not, when #8215 is fixed?
     build_err: (~str) -> ~str;
 }
 
-impl PkgSrc {
+fn prefixes(p: &Path) -> Prefixes {
+    Prefixes {
+        components: p.str_components().map(|x|x.unwrap().to_owned()).to_owned_vec(),
+        remaining: ~[]
+    }
+}
 
+struct Prefixes {
+    priv components: ~[~str],
+    priv remaining: ~[~str]
+}
+
+impl Iterator<(Path, Path)> for Prefixes {
+    #[inline]
+    fn next(&mut self) -> Option<(Path, Path)> {
+        if self.components.len() <= 1 {
+            None
+        }
+        else {
+            let last = self.components.pop();
+            self.remaining.unshift(last);
+            // converting to str and then back is a little unfortunate
+            Some((Path::new(self.components.connect("/")),
+                  Path::new(self.remaining.connect("/"))))
+        }
+    }
+}
+
+impl PkgSrc {
     pub fn new(mut source_workspace: Path,
                destination_workspace: Path,
                use_rust_path_hack: bool,
@@ -133,8 +159,9 @@ impl PkgSrc {
             None => {
                 // See if any of the prefixes of this package ID form a valid package ID
                 // That is, is this a package ID that points into the middle of a workspace?
-                for (prefix, suffix) in id.prefixes() {
-                    let crate_id = CrateId::new(prefix.as_str().unwrap());
+                for (prefix, suffix) in prefixes(&Path::new(id.path.as_slice())) {
+                    let crate_id: Option<CrateId> = from_str(prefix.as_str().unwrap());
+                    let crate_id = crate_id.expect("valid crate id");
                     let path = build_dir.join(crate_id.path.as_slice());
                     debug!("in loop: checking if {} is a directory", path.display());
                     if path.is_dir() {

@@ -239,7 +239,7 @@ impl CtxMethods for BuildContext {
             match cwd_to_workspace() {
                 None if dir_has_crate_file(&cwd) => {
                     // FIXME (#9639): This needs to handle non-utf8 paths
-                    let crateid = CrateId::new(cwd.filename_str().unwrap());
+                    let crateid = from_str(cwd.filename_str().unwrap()).expect("valid crate id");
                     let mut pkg_src = PkgSrc::new(cwd, default_workspace(), true, crateid);
                     self.build(&mut pkg_src, what);
                     match pkg_src {
@@ -264,7 +264,7 @@ impl CtxMethods for BuildContext {
         } else {
             // The package id is presumed to be the first command-line
             // argument
-            let crateid = CrateId::new(args[0].clone());
+            let crateid = from_str(args[0]).expect("valid crate id");
             let mut dest_ws = default_workspace();
             each_pkg_parent_workspace(&self.context, &crateid, |workspace| {
                 debug!("found pkg {} in workspace {}, trying to build",
@@ -303,7 +303,7 @@ impl CtxMethods for BuildContext {
                 else {
                     // The package id is presumed to be the first command-line
                     // argument
-                    let crateid = CrateId::new(args[0].clone());
+                    let crateid = from_str(args[0]).expect("valid crate id");
                     self.clean(&cwd, &crateid); // tjc: should use workspace, not cwd
                 }
             }
@@ -324,7 +324,7 @@ impl CtxMethods for BuildContext {
                             // FIXME (#9639): This needs to handle non-utf8 paths
 
                             let inferred_crateid =
-                                CrateId::new(cwd.filename_str().unwrap());
+                                from_str(cwd.filename_str().unwrap()).expect("valid crate id");
                             self.install(PkgSrc::new(cwd, default_workspace(),
                                                      true, inferred_crateid),
                                          &WhatToBuild::new(MaybeCustom, Everything));
@@ -340,7 +340,7 @@ impl CtxMethods for BuildContext {
                 else {
                     // The package id is presumed to be the first command-line
                     // argument
-                    let crateid = CrateId::new(args[0]);
+                    let crateid = from_str(args[0]).expect("valid crate id");
                     let workspaces = pkg_parent_workspaces(&self.context, &crateid);
                     debug!("package ID = {}, found it in {:?} workspaces",
                            crateid.to_str(), workspaces.len());
@@ -403,7 +403,7 @@ impl CtxMethods for BuildContext {
                     return usage::uninstall();
                 }
 
-                let crateid = CrateId::new(args[0]);
+                let crateid = from_str(args[0]).expect("valid crate id");
                 if !installed_packages::package_is_installed(&crateid) {
                     warn(format!("Package {} doesn't seem to be installed! \
                                   Doing nothing.", args[0]));
@@ -635,7 +635,8 @@ impl CtxMethods for BuildContext {
                target_exec.display(), target_lib,
                maybe_executable, maybe_library);
 
-        self.workcache_context.with_prep(id.install_tag(), |prep| {
+        let install_tag = format!("install({}-{})", id.path, id.version_or_default());
+        self.workcache_context.with_prep(install_tag, |prep| {
             for ee in maybe_executable.iter() {
                 // FIXME (#9639): This needs to handle non-utf8 paths
                 prep.declare_input("binary",

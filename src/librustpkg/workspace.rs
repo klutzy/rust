@@ -63,7 +63,8 @@ pub fn cwd_to_workspace() -> Option<(Path, CrateId)> {
             let rel = cwd.path_relative_from(&srcpath);
             let rel_s = rel.as_ref().and_then(|p|p.as_str());
             if rel_s.is_some() {
-                return Some((path, CrateId::new(rel_s.unwrap())));
+                let crate_id = from_str(rel_s.unwrap()).expect("valid crate id");
+                return Some((path, crate_id));
             }
         }
     }

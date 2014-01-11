@@ -455,8 +455,9 @@ impl<'a> Visitor<()> for ViewItemVisitor<'a> {
                     None => self.sess.str_of(lib_ident)
                 };
                 debug!("Finding and installing... {}", lib_name);
+                let crate_id: CrateId = from_str(lib_name).expect("valid crate id");
                 // Check standard Rust library path first
-                let whatever = system_library(&self.context.sysroot(), lib_name);
+                let whatever = system_library(&self.context.sysroot(), &crate_id);
                 debug!("system library returned {:?}", whatever);
                 match whatever {
                     Some(ref installed_path) => {
@@ -476,10 +477,8 @@ impl<'a> Visitor<()> for ViewItemVisitor<'a> {
                     }
                     None => {
                         // FIXME #8711: need to parse version out of path_opt
-                        debug!("Trying to install library {}, rebuilding it",
-                               lib_name.to_str());
+                        debug!("Trying to install library {}, rebuilding it", crate_id.to_str());
                         // Try to install it
-                        let crate_id = CrateId::new(lib_name);
                         // Find all the workspaces in the RUST_PATH that contain this package.
                         let workspaces = pkg_parent_workspaces(&self.context.context,
                                                                &crate_id);

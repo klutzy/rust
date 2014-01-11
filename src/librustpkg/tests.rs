@@ -365,19 +365,21 @@ fn assert_executable_exists(repo: &Path, short_name: &str) {
 }
 
 fn executable_exists(repo: &Path, short_name: &str) -> bool {
+    let crate_id = from_str(short_name).expect("valid crate id");
     debug!("executable_exists: repo = {}, short_name = {}", repo.display(), short_name);
-    let exec = target_executable_in_workspace(&CrateId::new(short_name), repo);
+    let exec = target_executable_in_workspace(&crate_id, repo);
     exec.exists() && is_rwx(&exec)
 }
 
 fn test_executable_exists(repo: &Path, short_name: &str) -> bool {
+    let crate_id = from_str(short_name).expect("valid crate id");
     debug!("test_executable_exists: repo = {}, short_name = {}", repo.display(), short_name);
-    let exec = built_test_in_workspace(&CrateId::new(short_name), repo);
+    let exec = built_test_in_workspace(&crate_id, repo);
     exec.map_or(false, |exec| exec.exists() && is_rwx(&exec))
 }
 
 fn remove_executable_file(p: &CrateId, workspace: &Path) {
-    let exec = target_executable_in_workspace(&CrateId::new(p.name), workspace);
+    let exec = target_executable_in_workspace(p, workspace);
     if exec.exists() {
         fs::unlink(&exec);
     }
@@ -390,7 +392,8 @@ fn assert_built_executable_exists(repo: &Path, short_name: &str) {
 fn built_executable_exists(repo: &Path, short_name: &str) -> bool {
     debug!("assert_built_executable_exists: repo = {}, short_name = {}",
             repo.display(), short_name);
-    let exec = built_executable_in_workspace(&CrateId::new(short_name), repo);
+    let crate_id = from_str(short_name).expect("valid crate id");
+    let exec = built_executable_in_workspace(&crate_id, repo);
     exec.is_some() && {
        let execname = exec.get_ref();
        execname.exists() && is_rwx(execname)
@@ -433,7 +436,8 @@ fn assert_built_library_exists(repo: &Path, short_name: &str) {
 
 fn built_library_exists(repo: &Path, short_name: &str) -> bool {
     debug!("assert_built_library_exists: repo = {}, short_name = {}", repo.display(), short_name);
-    let lib = built_library_in_workspace(&CrateId::new(short_name), repo);
+    let crate_id = from_str(short_name).expect("valid crate id");
+    let lib = built_library_in_workspace(&crate_id, repo);
     lib.is_some() && {
         let libname = lib.get_ref();
         libname.exists() && is_rwx(libname)
@@ -468,7 +472,8 @@ fn command_line_test_output_with_env(args: &[~str], env: ~[(~str, ~str)]) -> ~[~
 fn lib_output_file_name(workspace: &Path, short_name: &str) -> Path {
     debug!("lib_output_file_name: given {} and short name {}",
            workspace.display(), short_name);
-    library_in_workspace(&CrateId::new(short_name),
+    let crate_id = from_str(short_name).expect("valid crate id");
+    library_in_workspace(&crate_id,
                          Build,
                          workspace).expect("lib_output_file_name")
 }
@@ -618,7 +623,7 @@ fn test_install_invalid() {
 
 #[test]
 fn test_install_valid_external() {
-    let temp_pkg_id = CrateId::new("foo");
+    let temp_pkg_id: CrateId = from_str("foo").unwrap();
     let (tempdir, _) = mk_temp_workspace(&temp_pkg_id);
     let temp_workspace = tempdir.path();
     command_line_test([~"install", ~"foo"], temp_workspace);
@@ -705,8 +710,6 @@ fn test_install_git() {
 
 #[test]
 fn test_crate_ids_must_be_relative_path_like() {
-    use conditions::bad_pkg_id::cond;
-
     /*
     Okay:
     - One identifier, with no slashes
@@ -718,32 +721,16 @@ fn test_crate_ids_must_be_relative_path_like() {
 
     */
 
-    let whatever = CrateId::new("foo");
+    let foo: CrateId = from_str("foo").unwrap();
+    assert_eq!(~"foo#0.0", foo.to_str());
+    let test_pkg: CrateId = from_str("github.com/catamorphism/test-pkg").unwrap();
+    assert_eq!(~"github.com/catamorphism/test-pkg#0.0", test_pkg.to_str());
 
-    assert_eq!(~"foo#0.0", whatever.to_str());
-    assert!("github.com/catamorphism/test-pkg#0.0" ==
-            CrateId::new("github.com/catamorphism/test-pkg").to_str());
+    let x: Option<CrateId> = from_str("");
+    assert_eq!(x, None);
 
-    cond.trap(|(p, e)| {
-        assert!(p.filename().is_none())
-        assert!("0-length crate_id" == e);
-        whatever.clone()
-    }).inside(|| {
-        let x = CrateId::new("");
-        assert_eq!(~"foo#0.0", x.to_str());
-    });
-
-    cond.trap(|(p, e)| {
-        let abs = os::make_absolute(&Path::new("foo/bar/quux"));
-        assert_eq!(p, abs);
-        assert!("absolute crate_id" == e);
-        whatever.clone()
-    }).inside(|| {
-        let zp = os::make_absolute(&Path::new("foo/bar/quux"));
-        // FIXME (#9639): This needs to handle non-utf8 paths
-        let z = CrateId::new(zp.as_str().unwrap());
-        assert_eq!(~"foo#0.0", z.to_str());
-    })
+    let z: Option<CrateId> = from_str("/foo/bar/quux");
+    assert_eq!(z, None);
 }
 
 #[test]
@@ -768,7 +755,8 @@ fn test_package_request_version() {
 
     command_line_test([~"install", format!("{}\\#0.3", local_path)], repo);
 
-    assert!(match installed_library_in_workspace(&CrateId::new(format!("{}\\#0.3", local_path)),
+    let crate_id = from_str(format!("{}\\#0.3", local_path)).unwrap();
+    assert!(match installed_library_in_workspace(&crate_id,
                                                  &repo.join(".rust")) {
         Some(p) => {
             debug!("installed: {}", p.display());
@@ -777,7 +765,7 @@ fn test_package_request_version() {
         }
         None    => false
     });
-    let temp_pkg_id = CrateId::new("mockgithub.com/catamorphism/test_pkg_version#0.3");
+    let temp_pkg_id = from_str("mockgithub.com/catamorphism/test_pkg_version#0.3").unwrap();
     assert!(target_executable_in_workspace(&temp_pkg_id, &repo.join(".rust"))
             == repo.join_many([".rust", "bin", "test_pkg_version"]));
 
@@ -815,12 +803,14 @@ fn rustpkg_library_target() {
     add_git_tag(&package_dir, ~"0.0");
 
     command_line_test([~"install", ~"foo"], foo_repo);
-    assert_lib_exists(&foo_repo.join(".rust"), &CrateId::new("foo"));
+    let crate_id: CrateId = from_str("foo").unwrap();
+    assert_lib_exists(&foo_repo.join(".rust"), &crate_id);
 }
 
 #[test]
 fn rustpkg_local_pkg() {
-    let dir = create_local_package(&CrateId::new("foo"));
+    let crate_id: CrateId = from_str("foo").unwrap();
+    let dir = create_local_package(&crate_id);
     command_line_test([~"install", ~"foo"], dir.path());
     assert_executable_exists(dir.path(), "foo");
 }
@@ -828,7 +818,8 @@ fn rustpkg_local_pkg() {
 #[test]
 #[ignore(reason="busted")]
 fn package_script_with_default_build() {
-    let dir = create_local_package(&CrateId::new("fancy-lib"));
+    let crate_id: CrateId = from_str("fancy-lib").unwrap();
+    let dir = create_local_package(&crate_id);
     let dir = dir.path();
     debug!("dir = {}", dir.display());
     let mut source = test_sysroot().dir_path();
@@ -838,7 +829,7 @@ fn package_script_with_default_build() {
     debug!("package_script_with_default_build: {}", source.display());
     fs::copy(&source, &dir.join_many(["src", "fancy-lib-0.0", "pkg.rs"]));
     command_line_test([~"install", ~"fancy-lib"], dir);
-    assert_lib_exists(dir, &CrateId::new("fancy-lib"));
+    assert_lib_exists(dir, &crate_id);
     assert!(target_build_dir(dir).join_many([~"fancy-lib", ~"generated.rs"]).exists());
     let generated_path = target_build_dir(dir).join_many([~"fancy-lib", ~"generated.rs"]);
     debug!("generated path = {}", generated_path.display());
@@ -869,7 +860,8 @@ fn rustpkg_install_no_arg() {
               "fn main() { let _x = (); }");
     debug!("install_no_arg: dir = {}", package_dir.display());
     command_line_test([~"install"], &package_dir);
-    assert_lib_exists(&tmp, &CrateId::new("foo"));
+    let crate_id: CrateId = from_str("foo").unwrap();
+    assert_lib_exists(&tmp, &crate_id);
 }
 
 #[test]
@@ -885,14 +877,16 @@ fn rustpkg_clean_no_arg() {
     command_line_test([~"build"], &package_dir);
     assert_built_executable_exists(&tmp, "foo");
     command_line_test([~"clean"], &package_dir);
-    let res = built_executable_in_workspace(&CrateId::new("foo"), &tmp);
+    let crate_id: CrateId = from_str("foo").unwrap();
+    let res = built_executable_in_workspace(&crate_id, &tmp);
     assert!(!res.as_ref().map_or(false, |m| m.exists()));
 }
 
 #[test]
 fn rust_path_test() {
     let dir_for_path = TempDir::new("more_rust").expect("rust_path_test failed");
-    let dir = mk_workspace(dir_for_path.path(), &CrateId::new("foo"));
+    let crate_id: CrateId = from_str("foo").unwrap();
+    let dir = mk_workspace(dir_for_path.path(), &crate_id);
     debug!("dir = {}", dir.display());
     writeFile(&dir.join("main.rs"), "fn main() { let _x = (); }");
 
@@ -943,11 +937,11 @@ fn rust_path_parse() {
 fn test_list() {
     let dir = TempDir::new("test_list").expect("test_list failed");
     let dir = dir.path();
-    let foo = CrateId::new("foo");
+    let foo: CrateId = from_str("foo").unwrap();
     create_local_package_in(&foo, dir);
-    let bar = CrateId::new("bar");
+    let bar: CrateId = from_str("bar").unwrap();
     create_local_package_in(&bar, dir);
-    let quux = CrateId::new("quux");
+    let quux: CrateId = from_str("quux").unwrap();
     create_local_package_in(&quux, dir);
 
 // list doesn't output very much right now...
@@ -973,9 +967,9 @@ fn test_list() {
 fn install_remove() {
     let dir = TempDir::new("install_remove").expect("install_remove");
     let dir = dir.path();
-    let foo = CrateId::new("foo");
-    let bar = CrateId::new("bar");
-    let quux = CrateId::new("quux");
+    let foo: CrateId = from_str("foo").unwrap();
+    let bar: CrateId = from_str("bar").unwrap();
+    let quux: CrateId = from_str("quux").unwrap();
     create_local_package_in(&foo, dir);
     create_local_package_in(&bar, dir);
     create_local_package_in(&quux, dir);
@@ -1002,7 +996,7 @@ fn install_check_duplicates() {
     // check invariant that there are no dups in the pkg database
     let dir = TempDir::new("install_remove").expect("install_remove");
     let dir = dir.path();
-    let foo = CrateId::new("foo");
+    let foo: CrateId = from_str("foo").unwrap();
     create_local_package_in(&foo, dir);
 
     command_line_test([~"install", ~"foo"], dir);
@@ -1022,7 +1016,7 @@ fn install_check_duplicates() {
 
 #[test]
 fn no_rebuilding() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     command_line_test([~"build", ~"foo"], workspace);
@@ -1043,7 +1037,7 @@ fn no_rebuilding() {
 #[test]
 #[ignore]
 fn no_recopying() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     command_line_test([~"install", ~"foo"], workspace);
@@ -1062,8 +1056,8 @@ fn no_recopying() {
 
 #[test]
 fn no_rebuilding_dep() {
-    let p_id = CrateId::new("foo");
-    let dep_id = CrateId::new("bar");
+    let p_id: CrateId = from_str("foo").unwrap();
+    let dep_id: CrateId = from_str("bar").unwrap();
     let workspace = create_local_package_with_dep(&p_id, &dep_id);
     let workspace = workspace.path();
     command_line_test([~"build", ~"foo"], workspace);
@@ -1081,8 +1075,8 @@ fn no_rebuilding_dep() {
 
 #[test]
 fn do_rebuild_dep_dates_change() {
-    let p_id = CrateId::new("foo");
-    let dep_id = CrateId::new("bar");
+    let p_id: CrateId = from_str("foo").unwrap();
+    let dep_id: CrateId = from_str("bar").unwrap();
     let workspace = create_local_package_with_dep(&p_id, &dep_id);
     let workspace = workspace.path();
     command_line_test([~"build", ~"foo"], workspace);
@@ -1101,8 +1095,8 @@ fn do_rebuild_dep_dates_change() {
 
 #[test]
 fn do_rebuild_dep_only_contents_change() {
-    let p_id = CrateId::new("foo");
-    let dep_id = CrateId::new("bar");
+    let p_id: CrateId = from_str("foo").unwrap();
+    let dep_id: CrateId = from_str("bar").unwrap();
     let workspace = create_local_package_with_dep(&p_id, &dep_id);
     let workspace = workspace.path();
     command_line_test([~"build", ~"foo"], workspace);
@@ -1122,8 +1116,10 @@ fn do_rebuild_dep_only_contents_change() {
 
 #[test]
 fn test_versions() {
-    let workspace = create_local_package(&CrateId::new("foo#0.1"));
-    let _other_workspace = create_local_package(&CrateId::new("foo#0.2"));
+    let foo_01: CrateId = from_str("foo#0.1").unwrap();
+    let foo_02: CrateId = from_str("foo#0.2").unwrap();
+    let workspace = create_local_package(&foo_01);
+    let _other_workspace = create_local_package(&foo_02);
     command_line_test([~"install", ~"foo#0.1"], workspace.path());
     let output = command_line_test_output([~"list"]);
     // make sure output includes versions
@@ -1133,7 +1129,8 @@ fn test_versions() {
 #[test]
 #[ignore(reason = "do not yet implemented")]
 fn test_build_hooks() {
-    let workspace = create_local_package_with_custom_build_hook(&CrateId::new("foo"),
+    let crate_id: CrateId = from_str("foo").unwrap();
+    let workspace = create_local_package_with_custom_build_hook(&crate_id,
                                                                 "frob");
     command_line_test([~"do", ~"foo", ~"frob"], workspace.path());
 }
@@ -1143,14 +1140,16 @@ fn test_build_hooks() {
 #[ignore(reason = "info not yet implemented")]
 fn test_info() {
     let expected_info = ~"package foo"; // fill in
-    let workspace = create_local_package(&CrateId::new("foo"));
+    let crate_id: CrateId = from_str("foo").unwrap();
+    let workspace = create_local_package(&crate_id);
     let output = command_line_test([~"info", ~"foo"], workspace.path());
     assert_eq!(str::from_utf8_owned(output.output), expected_info);
 }
 
 #[test]
 fn test_uninstall() {
-    let workspace = create_local_package(&CrateId::new("foo"));
+    let crate_id: CrateId = from_str("foo").unwrap();
+    let workspace = create_local_package(&crate_id);
     command_line_test([~"uninstall", ~"foo"], workspace.path());
     let output = command_line_test([~"list"], workspace.path());
     assert!(!str::from_utf8(output.output).contains("foo"));
@@ -1284,7 +1283,7 @@ fn test_extern_mod_simpler() {
 
 #[test]
 fn test_import_rustpkg() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     writeFile(&workspace.join_many(["src", "foo-0.0", "pkg.rs"]),
@@ -1297,7 +1296,7 @@ fn test_import_rustpkg() {
 
 #[test]
 fn test_macro_pkg_script() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     writeFile(&workspace.join_many(["src", "foo-0.0", "pkg.rs"]),
@@ -1314,7 +1313,8 @@ fn multiple_workspaces() {
 // Copy the exact same package into directory B and install it
 // Set the RUST_PATH to A:B
 // Make a third package that uses foo, make sure we can build/install it
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
+    let bar_p_id: CrateId = from_str("bar").unwrap();
     let (a_loc, _pkg_dir) = mk_temp_workspace(&p_id);
     let (b_loc, _pkg_dir) = mk_temp_workspace(&p_id);
     let (a_loc, b_loc) = (a_loc.path(), b_loc.path());
@@ -1325,7 +1325,7 @@ fn multiple_workspaces() {
     // FIXME (#9639): This needs to handle non-utf8 paths
     let env = Some(~[(~"RUST_PATH", format!("{}:{}", a_loc.as_str().unwrap(),
                                             b_loc.as_str().unwrap()))]);
-    let c_loc = create_local_package_with_dep(&CrateId::new("bar"), &CrateId::new("foo"));
+    let c_loc = create_local_package_with_dep(&bar_p_id, &p_id);
     command_line_test_with_env([~"install", ~"bar"], c_loc.path(), env);
 }
 
@@ -1338,27 +1338,28 @@ fn rust_path_hack_test(hack_flag: bool) {
       make sure built files for foo are in B
       make sure nothing gets built into A or A/../build[lib,bin]
 */
-   let p_id = CrateId::new("foo");
-   let workspace = create_local_package(&p_id);
-   let workspace = workspace.path();
-   let dest_workspace = mk_empty_workspace(&CrateId::new("bar"), "dest_workspace");
-   let dest_workspace = dest_workspace.path();
-   let foo_path = workspace.join_many(["src", "foo-0.0"]);
-   let rust_path = Some(~[(~"RUST_PATH",
-       format!("{}:{}",
-               dest_workspace.as_str().unwrap(),
-               foo_path.as_str().unwrap()))]);
-   command_line_test_with_env(~[~"install"] + if hack_flag { ~[~"--rust-path-hack"] } else { ~[] } +
+    let p_id: CrateId = from_str("foo").unwrap();
+    let bar_p_id: CrateId = from_str("bar").unwrap();
+    let workspace = create_local_package(&p_id);
+    let workspace = workspace.path();
+    let dest_workspace = mk_empty_workspace(&bar_p_id, "dest_workspace");
+    let dest_workspace = dest_workspace.path();
+    let foo_path = workspace.join_many(["src", "foo-0.0"]);
+    let rust_path = Some(~[(~"RUST_PATH",
+        format!("{}:{}",
+                dest_workspace.as_str().unwrap(),
+                foo_path.as_str().unwrap()))]);
+    command_line_test_with_env(~[~"install"] + if hack_flag { ~[~"--rust-path-hack"] } else { ~[] } +
                                ~[~"foo"], dest_workspace, rust_path);
-   assert_lib_exists(dest_workspace, &CrateId::new("foo"));
-   assert_executable_exists(dest_workspace, "foo");
-   assert_built_library_exists(dest_workspace, "foo");
-   assert_built_executable_exists(dest_workspace, "foo");
-   assert!(!lib_exists(workspace, &CrateId::new("foo")));
-   assert!(!executable_exists(workspace, "foo"));
-   assert!(!built_library_exists(workspace, "foo"));
-   assert!(!built_executable_exists(workspace, "foo"));
-}
+    assert_lib_exists(dest_workspace, &p_id);
+    assert_executable_exists(dest_workspace, "foo");
+    assert_built_library_exists(dest_workspace, "foo");
+    assert_built_executable_exists(dest_workspace, "foo");
+    assert!(!lib_exists(workspace, &p_id));
+    assert!(!executable_exists(workspace, "foo"));
+    assert!(!built_library_exists(workspace, "foo"));
+    assert!(!built_executable_exists(workspace, "foo"));
+    }
 
 // Notice that this is the only test case where the --rust-path-hack
 // flag is actually needed
@@ -1383,88 +1384,95 @@ fn test_rust_path_can_contain_package_dirs_without_flag() {
 
 #[test]
 fn rust_path_hack_cwd() {
-   // Same as rust_path_hack_test, but the CWD is the dir to build out of
-   let cwd = TempDir::new("foo").expect("rust_path_hack_cwd");
-   let cwd = cwd.path().join("foo");
-   fs::mkdir_recursive(&cwd, io::UserRWX);
-   writeFile(&cwd.join("lib.rs"), "pub fn f() { }");
+    // Same as rust_path_hack_test, but the CWD is the dir to build out of
+    let cwd = TempDir::new("foo").expect("rust_path_hack_cwd");
+    let cwd = cwd.path().join("foo");
+    fs::mkdir_recursive(&cwd, io::UserRWX);
+    writeFile(&cwd.join("lib.rs"), "pub fn f() { }");
+    let foo_id: CrateId = from_str("foo").unwrap();
+    let bar_id: CrateId = from_str("bar").unwrap();
 
-   let dest_workspace = mk_empty_workspace(&CrateId::new("bar"), "dest_workspace");
-   let dest_workspace = dest_workspace.path();
-   // FIXME (#9639): This needs to handle non-utf8 paths
-   let rust_path = Some(~[(~"RUST_PATH", dest_workspace.as_str().unwrap().to_owned())]);
-   command_line_test_with_env([~"install", ~"--rust-path-hack", ~"foo"], &cwd, rust_path);
-   debug!("Checking that foo exists in {}", dest_workspace.display());
-   assert_lib_exists(dest_workspace, &CrateId::new("foo"));
-   assert_built_library_exists(dest_workspace, "foo");
-   assert!(!lib_exists(&cwd, &CrateId::new("foo")));
-   assert!(!built_library_exists(&cwd, "foo"));
+    let dest_workspace = mk_empty_workspace(&bar_id, "dest_workspace");
+    let dest_workspace = dest_workspace.path();
+    // FIXME (#9639): This needs to handle non-utf8 paths
+    let rust_path = Some(~[(~"RUST_PATH", dest_workspace.as_str().unwrap().to_owned())]);
+    command_line_test_with_env([~"install", ~"--rust-path-hack", ~"foo"], &cwd, rust_path);
+    debug!("Checking that foo exists in {}", dest_workspace.display());
+    assert_lib_exists(dest_workspace, &foo_id);
+    assert_built_library_exists(dest_workspace, "foo");
+    assert!(!lib_exists(&cwd, &foo_id));
+    assert!(!built_library_exists(&cwd, "foo"));
 }
 
 #[test]
 fn rust_path_hack_multi_path() {
-   // Same as rust_path_hack_test, but with a more complex package ID
-   let cwd = TempDir::new("pkg_files").expect("rust_path_hack_cwd");
-   let subdir = cwd.path().join_many(["foo", "bar", "quux"]);
-   fs::mkdir_recursive(&subdir, io::UserRWX);
-   writeFile(&subdir.join("lib.rs"), "pub fn f() { }");
-   let name = ~"foo/bar/quux";
+    // Same as rust_path_hack_test, but with a more complex package ID
+    let cwd = TempDir::new("pkg_files").expect("rust_path_hack_cwd");
+    let subdir = cwd.path().join_many(["foo", "bar", "quux"]);
+    fs::mkdir_recursive(&subdir, io::UserRWX);
+    writeFile(&subdir.join("lib.rs"), "pub fn f() { }");
+    let name = ~"foo/bar/quux";
+    let foo_id: CrateId = from_str("foo/bar/quux").unwrap();
+    let bar_id: CrateId = from_str("bar").unwrap();
 
-   let dest_workspace = mk_empty_workspace(&CrateId::new("bar"), "dest_workspace");
-   let dest_workspace = dest_workspace.path();
-   // FIXME (#9639): This needs to handle non-utf8 paths
-   let rust_path = Some(~[(~"RUST_PATH", dest_workspace.as_str().unwrap().to_owned())]);
-   command_line_test_with_env([~"install", ~"--rust-path-hack", name.clone()], &subdir, rust_path);
-   debug!("Checking that {} exists in {}", name, dest_workspace.display());
-   assert_lib_exists(dest_workspace, &CrateId::new("foo/bar/quux"));
-   assert_built_library_exists(dest_workspace, name);
-   assert!(!lib_exists(&subdir, &CrateId::new("foo/bar/quux")));
-   assert!(!built_library_exists(&subdir, name));
+    let dest_workspace = mk_empty_workspace(&bar_id, "dest_workspace");
+    let dest_workspace = dest_workspace.path();
+    // FIXME (#9639): This needs to handle non-utf8 paths
+    let rust_path = Some(~[(~"RUST_PATH", dest_workspace.as_str().unwrap().to_owned())]);
+    command_line_test_with_env([~"install", ~"--rust-path-hack", name.clone()], &subdir, rust_path);
+    debug!("Checking that {} exists in {}", name, dest_workspace.display());
+    assert_lib_exists(dest_workspace, &foo_id);
+    assert_built_library_exists(dest_workspace, name);
+    assert!(!lib_exists(&subdir, &foo_id));
+    assert!(!built_library_exists(&subdir, name));
 }
 
 #[test]
 fn rust_path_hack_install_no_arg() {
-   // Same as rust_path_hack_cwd, but making rustpkg infer the pkg id
-   let cwd = TempDir::new("pkg_files").expect("rust_path_hack_install_no_arg");
-   let cwd = cwd.path();
-   let source_dir = cwd.join("foo");
-   assert!(make_dir_rwx(&source_dir));
-   writeFile(&source_dir.join("lib.rs"), "pub fn f() { }");
+    // Same as rust_path_hack_cwd, but making rustpkg infer the pkg id
+    let cwd = TempDir::new("pkg_files").expect("rust_path_hack_install_no_arg");
+    let cwd = cwd.path();
+    let source_dir = cwd.join("foo");
+    assert!(make_dir_rwx(&source_dir));
+    writeFile(&source_dir.join("lib.rs"), "pub fn f() { }");
 
-   let dest_workspace = mk_empty_workspace(&CrateId::new("bar"), "dest_workspace");
-   let dest_workspace = dest_workspace.path();
-   // FIXME (#9639): This needs to handle non-utf8 paths
-   let rust_path = Some(~[(~"RUST_PATH", dest_workspace.as_str().unwrap().to_owned())]);
-   command_line_test_with_env([~"install", ~"--rust-path-hack"], &source_dir, rust_path);
-   debug!("Checking that foo exists in {}", dest_workspace.display());
-   assert_lib_exists(dest_workspace, &CrateId::new("foo"));
-   assert_built_library_exists(dest_workspace, "foo");
-   assert!(!lib_exists(&source_dir, &CrateId::new("foo")));
-   assert!(!built_library_exists(cwd, "foo"));
+    let foo_id: CrateId = from_str("foo").unwrap();
+    let bar_id: CrateId = from_str("bar").unwrap();
+    let dest_workspace = mk_empty_workspace(&bar_id, "dest_workspace");
+    let dest_workspace = dest_workspace.path();
+    // FIXME (#9639): This needs to handle non-utf8 paths
+    let rust_path = Some(~[(~"RUST_PATH", dest_workspace.as_str().unwrap().to_owned())]);
+    command_line_test_with_env([~"install", ~"--rust-path-hack"], &source_dir, rust_path);
+    debug!("Checking that foo exists in {}", dest_workspace.display());
+    assert_lib_exists(dest_workspace, &foo_id);
+    assert_built_library_exists(dest_workspace, "foo");
+    assert!(!lib_exists(&source_dir, &foo_id));
+    assert!(!built_library_exists(cwd, "foo"));
 }
 
 #[test]
 fn rust_path_hack_build_no_arg() {
-   // Same as rust_path_hack_install_no_arg, but building instead of installing
-   let cwd = TempDir::new("pkg_files").expect("rust_path_hack_build_no_arg");
-   let source_dir = cwd.path().join("foo");
-   assert!(make_dir_rwx(&source_dir));
-   writeFile(&source_dir.join("lib.rs"), "pub fn f() { }");
+    // Same as rust_path_hack_install_no_arg, but building instead of installing
+    let cwd = TempDir::new("pkg_files").expect("rust_path_hack_build_no_arg");
+    let source_dir = cwd.path().join("foo");
+    assert!(make_dir_rwx(&source_dir));
+    writeFile(&source_dir.join("lib.rs"), "pub fn f() { }");
 
-   let dest_workspace = mk_empty_workspace(&CrateId::new("bar"), "dest_workspace");
-   let dest_workspace = dest_workspace.path();
-   // FIXME (#9639): This needs to handle non-utf8 paths
-   let rust_path = Some(~[(~"RUST_PATH", dest_workspace.as_str().unwrap().to_owned())]);
-   command_line_test_with_env([~"build", ~"--rust-path-hack"], &source_dir, rust_path);
-   debug!("Checking that foo exists in {}", dest_workspace.display());
-   assert_built_library_exists(dest_workspace, "foo");
-   assert!(!built_library_exists(&source_dir, "foo"));
+    let bar_id: CrateId = from_str("bar").unwrap();
+    let dest_workspace = mk_empty_workspace(&bar_id, "dest_workspace");
+    let dest_workspace = dest_workspace.path();
+    // FIXME (#9639): This needs to handle non-utf8 paths
+    let rust_path = Some(~[(~"RUST_PATH", dest_workspace.as_str().unwrap().to_owned())]);
+    command_line_test_with_env([~"build", ~"--rust-path-hack"], &source_dir, rust_path);
+    debug!("Checking that foo exists in {}", dest_workspace.display());
+    assert_built_library_exists(dest_workspace, "foo");
+    assert!(!built_library_exists(&source_dir, "foo"));
 }
 
 #[test]
 fn rust_path_hack_build_with_dependency() {
-    let foo_id = CrateId::new("foo");
-    let dep_id = CrateId::new("dep");
+    let foo_id: CrateId = from_str("foo").unwrap();
+    let dep_id: CrateId = from_str("dep").unwrap();
     // Tests that when --rust-path-hack is in effect, dependencies get built
     // into the destination workspace and not the source directory
     let work_dir = create_local_package(&foo_id);
@@ -1489,7 +1497,8 @@ fn rust_path_hack_build_with_dependency() {
 fn rust_path_install_target() {
     let dir_for_path = TempDir::new(
         "source_workspace").expect("rust_path_install_target failed");
-    let mut dir = mk_workspace(dir_for_path.path(), &CrateId::new("foo"));
+    let foo_id: CrateId = from_str("foo").unwrap();
+    let mut dir = mk_workspace(dir_for_path.path(), &foo_id);
     debug!("dir = {}", dir.display());
     writeFile(&dir.join("main.rs"), "fn main() { let _x = (); }");
     let dir_to_install_to = TempDir::new(
@@ -1512,7 +1521,7 @@ fn rust_path_install_target() {
 
 #[test]
 fn sysroot_flag() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     // no-op sysroot setting; I'm not sure how else to test this
@@ -1528,7 +1537,7 @@ fn sysroot_flag() {
 
 #[test]
 fn compile_flag_build() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let test_sys = test_sysroot();
@@ -1545,7 +1554,7 @@ fn compile_flag_build() {
 #[test]
 fn compile_flag_fail() {
     // --no-link shouldn't be accepted for install
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let test_sys = test_sysroot();
@@ -1561,7 +1570,7 @@ fn compile_flag_fail() {
 
 #[test]
 fn notrans_flag_build() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let flags_to_test = [~"--no-trans", ~"--parse-only",
@@ -1586,7 +1595,7 @@ fn notrans_flag_build() {
 #[test]
 fn notrans_flag_fail() {
     // --no-trans shouldn't be accepted for install
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let flags_to_test = [~"--no-trans", ~"--parse-only",
@@ -1601,13 +1610,13 @@ fn notrans_flag_fail() {
                           workspace, None, BAD_FLAG_CODE);
         assert!(!built_executable_exists(workspace, "foo"));
         assert!(!object_file_exists(workspace, "foo"));
-        assert!(!lib_exists(workspace, &CrateId::new("foo")));
+        assert!(!lib_exists(workspace, &p_id));
     }
 }
 
 #[test]
 fn dash_S() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let test_sys = test_sysroot();
@@ -1624,7 +1633,7 @@ fn dash_S() {
 
 #[test]
 fn dash_S_fail() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let test_sys = test_sysroot();
@@ -1641,7 +1650,7 @@ fn dash_S_fail() {
 
 #[test]
 fn test_cfg_build() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     // If the cfg flag gets messed up, this won't compile
@@ -1660,7 +1669,7 @@ fn test_cfg_build() {
 
 #[test]
 fn test_cfg_fail() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     writeFile(&workspace.join_many(["src", "foo-0.0", "main.rs"]),
@@ -1679,7 +1688,7 @@ fn test_cfg_fail() {
 
 #[test]
 fn test_emit_llvm_S_build() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let test_sys = test_sysroot();
@@ -1697,7 +1706,7 @@ fn test_emit_llvm_S_build() {
 
 #[test]
 fn test_emit_llvm_S_fail() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let test_sys = test_sysroot();
@@ -1717,7 +1726,7 @@ fn test_emit_llvm_S_fail() {
 
 #[test]
 fn test_emit_llvm_build() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let test_sys = test_sysroot();
@@ -1736,7 +1745,7 @@ fn test_emit_llvm_build() {
 
 #[test]
 fn test_emit_llvm_fail() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let test_sys = test_sysroot();
@@ -1757,7 +1766,7 @@ fn test_emit_llvm_fail() {
 
 #[test]
 fn test_linker_build() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let matches = getopts([], optgroups());
@@ -1802,7 +1811,7 @@ fn test_build_install_flags_fail() {
 
 #[test]
 fn test_optimized_build() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let test_sys = test_sysroot();
@@ -1852,9 +1861,9 @@ fn crateid_pointing_to_subdir() {
 
 #[test]
 fn test_recursive_deps() {
-    let a_id = CrateId::new("a");
-    let b_id = CrateId::new("b");
-    let c_id = CrateId::new("c");
+    let a_id: CrateId = from_str("a").unwrap();
+    let b_id: CrateId = from_str("b").unwrap();
+    let c_id: CrateId = from_str("c").unwrap();
     let b_workspace = create_local_package_with_dep(&b_id, &c_id);
     let b_workspace = b_workspace.path();
     writeFile(&b_workspace.join_many(["src", "c-0.0", "lib.rs"]),
@@ -1871,17 +1880,18 @@ fn test_recursive_deps() {
     command_line_test_with_env([~"install", ~"a"],
                                a_workspace,
                                environment);
-    assert_lib_exists(a_workspace, &CrateId::new("a"));
-    assert_lib_exists(b_workspace, &CrateId::new("b"));
-    assert_lib_exists(b_workspace, &CrateId::new("c"));
+    assert_lib_exists(a_workspace, &a_id);
+    assert_lib_exists(b_workspace, &b_id);
+    assert_lib_exists(b_workspace, &c_id);
 }
 
 #[test]
 fn test_install_to_rust_path() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let second_workspace = create_local_package(&p_id);
     let second_workspace = second_workspace.path();
-    let first_workspace = mk_empty_workspace(&CrateId::new("p"), "dest");
+    let none_id: CrateId = from_str("p").unwrap();
+    let first_workspace = mk_empty_workspace(&none_id, "dest");
     let first_workspace = first_workspace.path();
     // FIXME (#9639): This needs to handle non-utf8 paths
     let rust_path = Some(~[(~"RUST_PATH",
@@ -1902,7 +1912,7 @@ fn test_install_to_rust_path() {
 
 #[test]
 fn test_target_specific_build_dir() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let test_sys = test_sysroot();
@@ -1918,7 +1928,7 @@ fn test_target_specific_build_dir() {
 
 #[test]
 fn test_target_specific_install_dir() {
-    let p_id = CrateId::new("foo");
+    let p_id: CrateId = from_str("foo").unwrap();
     let workspace = create_local_package(&p_id);
     let workspace = workspace.path();
     let test_sys = test_sysroot();
@@ -1928,7 +1938,7 @@ fn test_target_specific_install_dir() {
                        ~"foo"],
                       workspace);
     assert!(workspace.join_many([~"lib", host_triple()]).is_dir());
-    assert_lib_exists(workspace, &CrateId::new("foo"));
+    assert_lib_exists(workspace, &p_id);
     assert!(fs::readdir(&workspace.join("lib")).len() == 1);
     assert!(workspace.join("bin").is_dir());
     assert_executable_exists(workspace, "foo");
@@ -1937,7 +1947,7 @@ fn test_target_specific_install_dir() {
 #[test]
 #[ignore(reason = "See #7240")]
 fn test_dependencies_terminate() {
-    let b_id = CrateId::new("b");
+    let b_id: CrateId = from_str("b").unwrap();
     let workspace = create_local_package(&b_id);
     let workspace = workspace.path();
     let b_dir = workspace.join_many(["src", "b-0.0"]);
@@ -1950,7 +1960,7 @@ fn test_dependencies_terminate() {
 
 #[test]
 fn install_after_build() {
-    let b_id = CrateId::new("b");
+    let b_id: CrateId = from_str("b").unwrap();
     let workspace = create_local_package(&b_id);
     let workspace = workspace.path();
     command_line_test([~"build", ~"b"], workspace);
@@ -1961,7 +1971,7 @@ fn install_after_build() {
 
 #[test]
 fn reinstall() {
-    let b = CrateId::new("b");
+    let b: CrateId = from_str("b").unwrap();
     let workspace = create_local_package(&b);
     let workspace = workspace.path();
     // 1. Install, then remove executable file, then install again,
@@ -2000,11 +2010,11 @@ fn correct_package_name_with_rust_path_hack() {
     */
 
     // Set RUST_PATH to something containing only the sources for foo
-    let foo_id = CrateId::new("foo");
-    let bar_id = CrateId::new("bar");
+    let foo_id: CrateId = from_str("foo").unwrap();
+    let bar_id: CrateId = from_str("bar").unwrap();
     let foo_workspace = create_local_package(&foo_id);
     let foo_workspace = foo_workspace.path();
-    let dest_workspace = mk_empty_workspace(&CrateId::new("bar"), "dest_workspace");
+    let dest_workspace = mk_empty_workspace(&bar_id, "dest_workspace");
     let dest_workspace = dest_workspace.path();
 
     writeFile(&dest_workspace.join_many(["src", "bar-0.0", "main.rs"]),
@@ -2030,7 +2040,7 @@ fn correct_package_name_with_rust_path_hack() {
 
 #[test]
 fn test_rustpkg_test_creates_exec() {
-    let foo_id = CrateId::new("foo");
+    let foo_id: CrateId = from_str("foo").unwrap();
     let foo_workspace = create_local_package(&foo_id);
     let foo_workspace = foo_workspace.path();
     writeFile(&foo_workspace.join_many(["src", "foo-0.0", "test.rs"]),
@@ -2041,7 +2051,8 @@ fn test_rustpkg_test_creates_exec() {
 
 #[test]
 fn test_rustpkg_test_output() {
-    let workspace = create_local_package_with_test(&CrateId::new("foo"));
+    let foo_id: CrateId = from_str("foo").unwrap();
+    let workspace = create_local_package_with_test(&foo_id);
     let output = command_line_test([~"test", ~"foo"], workspace.path());
     let output_str = str::from_utf8(output.output);
     // The first two assertions are separate because test output may
@@ -2053,7 +2064,7 @@ fn test_rustpkg_test_output() {
 
 #[test]
 fn test_rustpkg_test_failure_exit_status() {
-    let foo_id = CrateId::new("foo");
+    let foo_id: CrateId = from_str("foo").unwrap();
     let foo_workspace = create_local_package(&foo_id);
     let foo_workspace = foo_workspace.path();
     writeFile(&foo_workspace.join_many(["src", "foo-0.0", "test.rs"]),
@@ -2067,7 +2078,7 @@ fn test_rustpkg_test_failure_exit_status() {
 
 #[test]
 fn test_rustpkg_test_cfg() {
-    let foo_id = CrateId::new("foo");
+    let foo_id: CrateId = from_str("foo").unwrap();
     let foo_workspace = create_local_package(&foo_id);
     let foo_workspace = foo_workspace.path();
     writeFile(&foo_workspace.join_many(["src", "foo-0.0", "test.rs"]),
@@ -2080,7 +2091,7 @@ fn test_rustpkg_test_cfg() {
 
 #[test]
 fn test_rebuild_when_needed() {
-    let foo_id = CrateId::new("foo");
+    let foo_id: CrateId = from_str("foo").unwrap();
     let foo_workspace = create_local_package(&foo_id);
     let foo_workspace = foo_workspace.path();
     let test_crate = foo_workspace.join_many(["src", "foo-0.0", "test.rs"]);
@@ -2101,7 +2112,7 @@ fn test_rebuild_when_needed() {
 #[test]
 #[ignore] // FIXME (#10257): This doesn't work as is since a read only file can't execute
 fn test_no_rebuilding() {
-    let foo_id = CrateId::new("foo");
+    let foo_id: CrateId = from_str("foo").unwrap();
     let foo_workspace = create_local_package(&foo_id);
     let foo_workspace = foo_workspace.path();
     let test_crate = foo_workspace.join_many(["src", "foo-0.0", "test.rs"]);
@@ -2172,7 +2183,8 @@ fn test_installed_local_changes() {
 
 #[test]
 fn test_7402() {
-    let dir = create_local_package(&CrateId::new("foo"));
+    let foo_id: CrateId = from_str("foo").unwrap();
+    let dir = create_local_package(&foo_id);
     let dest_workspace = TempDir::new("more_rust").expect("test_7402");
     let dest_workspace = dest_workspace.path();
     // FIXME (#9639): This needs to handle non-utf8 paths
@@ -2186,7 +2198,7 @@ fn test_7402() {
 
 #[test]
 fn test_compile_error() {
-    let foo_id = CrateId::new("foo");
+    let foo_id: CrateId = from_str("foo").unwrap();
     let foo_workspace = create_local_package(&foo_id);
     let foo_workspace = foo_workspace.path();
     let main_crate = foo_workspace.join_many(["src", "foo-0.0", "main.rs"]);
@@ -2220,7 +2232,8 @@ fn test_c_dependency_ok() {
     // registers a hook to build it if it's not fresh
     // After running `build`, test that the C library built
 
-    let dir = create_local_package(&CrateId::new("cdep"));
+    let cdep_id: CrateId = from_str("cdep").unwrap();
+    let dir = create_local_package(&cdep_id);
     let dir = dir.path();
     writeFile(&dir.join_many(["src", "cdep-0.0", "main.rs"]),
               "#[link_args = \"-lfoo\"]\nextern { fn f(); } \
@@ -2243,7 +2256,8 @@ fn test_c_dependency_ok() {
 #[test]
 #[ignore(reason="busted")]
 fn test_c_dependency_no_rebuilding() {
-    let dir = create_local_package(&CrateId::new("cdep"));
+    let cdep_id: CrateId = from_str("cdep").unwrap();
+    let dir = create_local_package(&cdep_id);
     let dir = dir.path();
     writeFile(&dir.join_many(["src", "cdep-0.0", "main.rs"]),
               "#[link_args = \"-lfoo\"]\nextern { fn f(); } \
@@ -2277,7 +2291,8 @@ fn test_c_dependency_no_rebuilding() {
 #[test]
 #[ignore(reason="busted")]
 fn test_c_dependency_yes_rebuilding() {
-    let dir = create_local_package(&CrateId::new("cdep"));
+    let cdep_id: CrateId = from_str("cdep").unwrap();
+    let dir = create_local_package(&cdep_id);
     let dir = dir.path();
     writeFile(&dir.join_many(["src", "cdep-0.0", "main.rs"]),
               "#[link_args = \"-lfoo\"]\nextern { fn f(); } \
@@ -2298,7 +2313,7 @@ fn test_c_dependency_yes_rebuilding() {
     assert!(c_library_path.exists());
 
     // Now, make the Rust library read-only so rebuilding will fail
-    match built_library_in_workspace(&CrateId::new("cdep"), dir) {
+    match built_library_in_workspace(&cdep_id, dir) {
         Some(ref pth) => assert!(chmod_read_only(pth)),
         None => assert_built_library_exists(dir, "cdep")
     }
@@ -2316,7 +2331,8 @@ fn test_c_dependency_yes_rebuilding() {
 fn correct_error_dependency() {
     // Supposing a package we're trying to install via a dependency doesn't
     // exist, we should throw a condition, and not ICE
-    let workspace_dir = create_local_package(&CrateId::new("badpkg"));
+    let crate_id: CrateId = from_str("badpkg").unwrap();
+    let workspace_dir = create_local_package(&crate_id);
 
     let dir = workspace_dir.path();
     let main_rs = dir.join_many(["src", "badpkg-0.0", "main.rs"]);

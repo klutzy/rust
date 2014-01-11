@@ -8,7 +8,6 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use version::split_version;
 use extra::hex::ToHex;
 use rustc::util::sha2::{Digest, Sha256};
 
@@ -48,40 +47,57 @@ impl ToStr for CrateId {
     }
 }
 
+impl FromStr for CrateId {
+    fn from_str(s: &str) -> Option<CrateId> {
+        let pieces: ~[&str] = s.splitn('#', 1).collect();
+        let path = pieces[0].to_owned();
+
+        if path.starts_with("/") || path.ends_with("/") ||
+            path.starts_with(".") || path.is_empty() {
+            return None;
+        }
+
+        let path_pieces: ~[&str] = path.rsplitn('/', 1).collect();
+        let inferred_name = path_pieces[0];
+
+        let (name, version) = if pieces.len() == 1 {
+            (inferred_name.to_owned(), None)
+        } else {
+            let hash_pieces: ~[&str] = pieces[1].splitn(':', 1).collect();
+            let (hash_name, hash_version) = if hash_pieces.len() == 1 {
+                ("", hash_pieces[0])
+            } else {
+                (hash_pieces[0], hash_pieces[1])
+            };
+
+            let name = if !hash_name.is_empty() {
+                hash_name.to_owned()
+            } else {
+                inferred_name.to_owned()
+            };
+
+            let version = if !hash_version.is_empty() {
+                Some(hash_version.to_owned())
+            } else {
+                None
+            };
+
+            (name, version)
+        };
+
+        Some(CrateId {
+            path: path,
+            name: name,
+            version: version,
+        })
+    }
+}
+
 impl CrateId {
     pub fn version_or_default<'a>(&'a self) -> &'a str {
         match self.version {
             Some(ref ver) => ver.as_slice(),
             None => "0.0"
-        }
-    }
-
-    pub fn new(s: &str) -> CrateId {
-        use conditions::bad_pkg_id::cond;
-
-        // Did the user request a specific version?
-        let (s, version) = match split_version(s) {
-            Some((path, v)) => {
-                (path, v)
-            }
-            None => {
-                (s, None)
-            }
-        };
-
-        let path = Path::new(s);
-        if !path.is_relative() {
-            return cond.raise((path, ~"absolute crate_id"));
-        }
-        if path.filename().is_none() {
-            return cond.raise((path, ~"0-length crate_id"));
-        }
-        let name = path.filestem_str().expect(format!("Strange path! {}", s));
-
-        CrateId {
-            path: s.to_owned(),
-            name: name.to_owned(),
-            version: version
         }
     }
 
@@ -100,52 +116,4 @@ impl CrateId {
     pub fn short_name_with_version(&self) -> ~str {
         format!("{}-{}", self.name, self.version_or_default())
     }
-
-    /// True if the ID has multiple components
-    pub fn is_complex(&self) -> bool {
-        self.name != self.path
-    }
-
-    pub fn prefixes(&self) -> Prefixes {
-        prefixes(&Path::new(self.path.as_slice()))
-    }
-
-    // This is the workcache function name for the *installed*
-    // binaries for this package (as opposed to the built ones,
-    // which are per-crate).
-    pub fn install_tag(&self) -> ~str {
-        format!("install({}-{})", self.path, self.version_or_default())
-    }
-}
-
-pub fn prefixes(p: &Path) -> Prefixes {
-    Prefixes {
-        components: p.str_components().map(|x|x.unwrap().to_owned()).to_owned_vec(),
-        remaining: ~[]
-    }
-}
-
-struct Prefixes {
-    priv components: ~[~str],
-    priv remaining: ~[~str]
-}
-
-impl Iterator<(Path, Path)> for Prefixes {
-    #[inline]
-    fn next(&mut self) -> Option<(Path, Path)> {
-        if self.components.len() <= 1 {
-            None
-        }
-        else {
-            let last = self.components.pop();
-            self.remaining.unshift(last);
-            // converting to str and then back is a little unfortunate
-            Some((Path::new(self.components.connect("/")),
-                  Path::new(self.remaining.connect("/"))))
-        }
-    }
-}
-
-pub fn write<W: Writer>(writer: &mut W, string: &str) {
-    writer.write(string.as_bytes());
 }

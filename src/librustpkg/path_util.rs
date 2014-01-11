@@ -200,8 +200,8 @@ pub fn library_in_workspace(crate_id: &CrateId, where: Target, workspace: &Path)
 }
 
 // rustc doesn't use target-specific subdirectories
-pub fn system_library(sysroot: &Path, crate_id: &str) -> Option<Path> {
-    library_in(&CrateId::new(crate_id), &sysroot.join(libdir()))
+pub fn system_library(sysroot: &Path, crate_id: &CrateId) -> Option<Path> {
+    library_in(crate_id, &sysroot.join(libdir()))
 }
 
 fn library_in(crate_id: &CrateId, dir_to_search: &Path) -> Option<Path> {
