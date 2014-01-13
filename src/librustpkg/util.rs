@@ -225,7 +225,7 @@ pub fn compile_input(context: &BuildContext,
 
     debug!("Output type = {:?}", output_type);
 
-    let options = @session::options {
+    let options = @session::Options {
         optimize: opt,
         test: what == Test || what == Bench,
         maybe_sysroot: Some(sysroot_to_use),

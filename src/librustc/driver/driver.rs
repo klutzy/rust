@@ -649,9 +649,9 @@ static architecture_abis : &'static [(&'static str, abi::Architecture)] = &'stat
 
     ("mips",   abi::Mips)];
 
-pub fn build_target_config(sopts: @session::options,
+pub fn build_target_config(sopts: @session::Options,
                            demitter: @diagnostic::Emitter)
-                           -> @session::config {
+                           -> @session::Config {
     let os = match get_os(sopts.target_triple) {
       Some(os) => os,
       None => early_error(demitter, "unknown operating system")
@@ -674,7 +674,7 @@ pub fn build_target_config(sopts: @session::options,
       abi::Arm => arm::get_target_strs(target_triple, os),
       abi::Mips => mips::get_target_strs(target_triple, os)
     };
-    let target_cfg = @session::config {
+    let target_cfg = @session::Config {
         os: os,
         arch: arch,
         target_strs: target_strs,
@@ -699,7 +699,7 @@ pub fn host_triple() -> ~str {
 pub fn build_session_options(binary: ~str,
                              matches: &getopts::Matches,
                              demitter: @diagnostic::Emitter)
-                             -> @session::options {
+                             -> @session::Options {
     let mut outputs = ~[];
     if matches.opt_present("rlib") {
         outputs.push(session::OutputRlib)
@@ -847,7 +847,7 @@ pub fn build_session_options(binary: ~str,
                        matches.opt_present("crate-name"),
                        matches.opt_present("crate-file-name"));
 
-    let sopts = @session::options {
+    let sopts = @session::Options {
         outputs: outputs,
         gc: gc,
         optimize: opt_level,
@@ -880,7 +880,7 @@ pub fn build_session_options(binary: ~str,
     return sopts;
 }
 
-pub fn build_session(sopts: @session::options, demitter: @diagnostic::Emitter)
+pub fn build_session(sopts: @session::Options, demitter: @diagnostic::Emitter)
                      -> Session {
     let codemap = @codemap::CodeMap::new();
     let diagnostic_handler =
@@ -890,7 +890,7 @@ pub fn build_session(sopts: @session::options, demitter: @diagnostic::Emitter)
     build_session_(sopts, codemap, demitter, span_diagnostic_handler)
 }
 
-pub fn build_session_(sopts: @session::options,
+pub fn build_session_(sopts: @session::Options,
                       cm: @codemap::CodeMap,
                       demitter: @diagnostic::Emitter,
                       span_diagnostic_handler: @diagnostic::SpanHandler)

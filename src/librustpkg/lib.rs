@@ -106,7 +106,7 @@ impl<'a> PkgScript<'a> {
         // Build the rustc session data structures to pass
         // to the compiler
         debug!("pkgscript parse: {}", sysroot.display());
-        let options = @session::options {
+        let options = @session::Options {
             binary: binary,
             maybe_sysroot: Some(@sysroot),
             outputs: ~[session::OutputExecutable],
