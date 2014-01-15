@@ -25,13 +25,13 @@ use std::util;
 
 pub use ext::tt::transcribe::{TtReader, new_tt_reader};
 
-pub trait Reader {
+pub trait TokenReader {
     fn is_eof(&self) -> bool;
     fn next_token(&self) -> TokenAndSpan;
     fn fatal(&self, ~str) -> !;
     fn span_diag(&self) -> @SpanHandler;
     fn peek(&self) -> TokenAndSpan;
-    fn dup(&self) -> @Reader;
+    fn dup(&self) -> @TokenReader;
 }
 
 #[deriving(Clone, Eq)]
@@ -104,7 +104,7 @@ fn dup_string_reader(r: &StringReader) -> @StringReader {
     }
 }
 
-impl Reader for StringReader {
+impl TokenReader for StringReader {
     fn is_eof(&self) -> bool { is_eof(self) }
     // return the next token. EFFECT: advances the string_reader.
     fn next_token(&self) -> TokenAndSpan {
@@ -129,10 +129,10 @@ impl Reader for StringReader {
             sp: self.peek_span.get(),
         }
     }
-    fn dup(&self) -> @Reader { dup_string_reader(self) as @Reader }
+    fn dup(&self) -> @TokenReader { dup_string_reader(self) as @TokenReader }
 }
 
-impl Reader for TtReader {
+impl TokenReader for TtReader {
     fn is_eof(&self) -> bool {
         let cur_tok = self.cur_tok.borrow();
         *cur_tok.get() == token::EOF
@@ -152,7 +152,7 @@ impl Reader for TtReader {
             sp: self.cur_span.get(),
         }
     }
-    fn dup(&self) -> @Reader { dup_tt_reader(self) as @Reader }
+    fn dup(&self) -> @TokenReader { dup_tt_reader(self) as @TokenReader }
 }
 
 // report a lexical error spanning [`from_pos`, `to_pos`)

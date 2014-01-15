@@ -272,7 +272,7 @@ pub fn filemap_to_tts(sess: @ParseSess, filemap: @FileMap)
     // parsing tt's probably shouldn't require a parser at all.
     let cfg = ~[];
     let srdr = lexer::new_string_reader(sess.span_diagnostic, filemap);
-    let mut p1 = Parser(sess, cfg, srdr as @lexer::Reader);
+    let mut p1 = Parser(sess, cfg, srdr as @lexer::TokenReader);
     p1.parse_all_token_trees()
 }
 
@@ -281,7 +281,7 @@ pub fn tts_to_parser(sess: @ParseSess,
                      tts: ~[ast::TokenTree],
                      cfg: ast::CrateConfig) -> Parser {
     let trdr = lexer::new_tt_reader(sess.span_diagnostic, None, tts);
-    Parser(sess, cfg, trdr as @lexer::Reader)
+    Parser(sess, cfg, trdr as @lexer::TokenReader)
 }
 
 // abort if necessary

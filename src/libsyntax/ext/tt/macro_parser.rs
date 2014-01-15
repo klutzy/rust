@@ -203,7 +203,7 @@ pub enum ParseResult {
 
 pub fn parse_or_else(sess: @ParseSess,
                      cfg: ast::CrateConfig,
-                     rdr: @Reader,
+                     rdr: @TokenReader,
                      ms: ~[Matcher])
                      -> HashMap<Ident, @NamedMatch> {
     match parse(sess, cfg, rdr, ms) {
@@ -224,7 +224,7 @@ pub fn token_name_eq(t1 : &Token, t2 : &Token) -> bool {
 
 pub fn parse(sess: @ParseSess,
              cfg: ast::CrateConfig,
-             rdr: @Reader,
+             rdr: @TokenReader,
              ms: &[Matcher])
              -> ParseResult {
     let mut cur_eis = ~[];

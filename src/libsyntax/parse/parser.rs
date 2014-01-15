@@ -68,7 +68,7 @@ use parse::attr::ParserAttr;
 use parse::classify;
 use parse::common::{SeqSep, seq_sep_none};
 use parse::common::{seq_sep_trailing_disallowed, seq_sep_trailing_allowed};
-use parse::lexer::Reader;
+use parse::lexer::TokenReader;
 use parse::lexer::TokenAndSpan;
 use parse::obsolete::*;
 use parse::token::{can_begin_expr, get_ident_interner, ident_to_str, is_ident};
@@ -285,7 +285,7 @@ struct ParsedItemsAndViewItems {
 
 /* ident is handled by common.rs */
 
-pub fn Parser(sess: @ParseSess, cfg: ast::CrateConfig, rdr: @Reader)
+pub fn Parser(sess: @ParseSess, cfg: ast::CrateConfig, rdr: @TokenReader)
               -> Parser {
     let tok0 = rdr.next_token();
     let interner = get_ident_interner();
@@ -339,7 +339,7 @@ pub struct Parser {
     tokens_consumed: uint,
     restriction: restriction,
     quote_depth: uint, // not (yet) related to the quasiquoter
-    reader: @Reader,
+    reader: @TokenReader,
     interner: @token::IdentInterner,
     /// The set of seen errors about obsolete syntax. Used to suppress
     /// extra detail when the same error is seen twice

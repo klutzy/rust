@@ -18,7 +18,7 @@ use ext::base;
 use ext::tt::macro_parser::{Success, Error, Failure};
 use ext::tt::macro_parser::{NamedMatch, MatchedSeq, MatchedNonterminal};
 use ext::tt::macro_parser::{parse, parse_or_else};
-use parse::lexer::{new_tt_reader, Reader};
+use parse::lexer::{new_tt_reader, TokenReader};
 use parse::parser::Parser;
 use parse::attr::ParserAttr;
 use parse::token::{get_ident_interner, special_idents, gensym_ident, ident_to_str};
@@ -129,7 +129,7 @@ fn generic_extension(cx: &ExtCtxt,
         match **lhs {
           MatchedNonterminal(NtMatchers(ref mtcs)) => {
             // `none` is because we're not interpolating
-            let arg_rdr = new_tt_reader(s_d, None, arg.to_owned()) as @Reader;
+            let arg_rdr = new_tt_reader(s_d, None, arg.to_owned()) as @TokenReader;
             match parse(cx.parse_sess(), cx.cfg(), arg_rdr, *mtcs) {
               Success(named_matches) => {
                 let rhs = match *rhses[i] {
@@ -149,7 +149,7 @@ fn generic_extension(cx: &ExtCtxt,
                 // rhs has holes ( `$id` and `$(...)` that need filled)
                 let trncbr = new_tt_reader(s_d, Some(named_matches),
                                            rhs);
-                let p = Parser(cx.parse_sess(), cx.cfg(), trncbr as @Reader);
+                let p = Parser(cx.parse_sess(), cx.cfg(), trncbr as @TokenReader);
                 // Let the context choose how to interpret the result.
                 // Weird, but useful for X-macros.
                 return MRAny(@ParserAnyMacro {
@@ -210,7 +210,7 @@ pub fn add_new_extension(cx: &mut ExtCtxt,
                                    arg.clone());
     let argument_map = parse_or_else(cx.parse_sess(),
                                      cx.cfg(),
-                                     arg_reader as @Reader,
+                                     arg_reader as @TokenReader,
                                      argument_gram);
 
     // Extract the arguments:

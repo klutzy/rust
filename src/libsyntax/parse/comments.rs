@@ -11,7 +11,7 @@
 use ast;
 use codemap::{BytePos, CharPos, CodeMap, Pos};
 use diagnostic;
-use parse::lexer::{is_whitespace, with_str_from, Reader};
+use parse::lexer::{is_whitespace, with_str_from, TokenReader};
 use parse::lexer::{StringReader, bump, is_eof, nextch, TokenAndSpan};
 use parse::lexer::{is_line_non_doc_comment, is_block_non_doc_comment};
 use parse::lexer;
@@ -280,7 +280,7 @@ fn read_block_comment(rdr: @StringReader,
         while level > 0 {
             debug!("=== block comment level {}", level);
             if is_eof(rdr) {
-                (rdr as @Reader).fatal(~"unterminated block comment");
+                rdr.fatal(~"unterminated block comment");
             }
             if rdr.curr.get() == '\n' {
                 trim_whitespace_prefix_and_push_line(&mut lines, curr_line,

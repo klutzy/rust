@@ -12,7 +12,7 @@ use ast;
 use codemap::Span;
 use ext::base::ExtCtxt;
 use ext::base;
-use parse::lexer::{new_tt_reader, Reader};
+use parse::lexer::{new_tt_reader, TokenReader};
 use parse::parser::Parser;
 use parse::token::keywords;
 
@@ -25,7 +25,7 @@ pub fn expand_trace_macros(cx: &mut ExtCtxt,
     let tt_rdr = new_tt_reader(cx.parse_sess().span_diagnostic,
                                None,
                                tt.to_owned());
-    let rdr = tt_rdr as @Reader;
+    let rdr = tt_rdr as @TokenReader;
     let mut rust_parser = Parser(sess, cfg.clone(), rdr.dup());
 
     if rust_parser.is_keyword(keywords::True) {
