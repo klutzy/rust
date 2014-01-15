@@ -73,7 +73,7 @@ pub fn new_tt_reader(sp_diag: @SpanHandler,
     return r;
 }
 
-fn dup_tt_frame(f: @TtFrame) -> @TtFrame {
+fn dup_tt_frame(f: &TtFrame) -> @TtFrame {
     @TtFrame {
         forest: @(*f.forest).clone(),
         idx: f.idx.clone(),
@@ -86,7 +86,7 @@ fn dup_tt_frame(f: @TtFrame) -> @TtFrame {
     }
 }
 
-pub fn dup_tt_reader(r: @TtReader) -> @TtReader {
+pub fn dup_tt_reader(r: &TtReader) -> @TtReader {
     @TtReader {
         sp_diag: r.sp_diag,
         stack: RefCell::new(dup_tt_frame(r.stack.get())),

@@ -28,10 +28,10 @@ pub use ext::tt::transcribe::{TtReader, new_tt_reader};
 pub trait Reader {
     fn is_eof(@self) -> bool;
     fn next_token(@self) -> TokenAndSpan;
-    fn fatal(@self, ~str) -> !;
-    fn span_diag(@self) -> @SpanHandler;
+    fn fatal(&self, ~str) -> !;
+    fn span_diag(&self) -> @SpanHandler;
     fn peek(@self) -> TokenAndSpan;
-    fn dup(@self) -> @Reader;
+    fn dup(&self) -> @Reader;
 }
 
 #[deriving(Clone, Eq)]
@@ -90,7 +90,7 @@ pub fn new_low_level_string_reader(span_diagnostic: @SpanHandler,
 // duplicating the string reader is probably a bad idea, in
 // that using them will cause interleaved pushes of line
 // offsets to the underlying filemap...
-fn dup_string_reader(r: @StringReader) -> @StringReader {
+fn dup_string_reader(r: &StringReader) -> @StringReader {
     @StringReader {
         span_diagnostic: r.span_diagnostic,
         src: r.src,
@@ -118,10 +118,10 @@ impl Reader for StringReader {
         string_advance_token(self);
         ret_val
     }
-    fn fatal(@self, m: ~str) -> ! {
+    fn fatal(&self, m: ~str) -> ! {
         self.span_diagnostic.span_fatal(self.peek_span.get(), m)
     }
-    fn span_diag(@self) -> @SpanHandler { self.span_diagnostic }
+    fn span_diag(&self) -> @SpanHandler { self.span_diagnostic }
     fn peek(@self) -> TokenAndSpan {
         // XXX(pcwalton): Bad copy!
         TokenAndSpan {
@@ -129,7 +129,7 @@ impl Reader for StringReader {
             sp: self.peek_span.get(),
         }
     }
-    fn dup(@self) -> @Reader { dup_string_reader(self) as @Reader }
+    fn dup(&self) -> @Reader { dup_string_reader(self) as @Reader }
 }
 
 impl Reader for TtReader {
@@ -142,21 +142,21 @@ impl Reader for TtReader {
         debug!("TtReader: r={:?}", r);
         return r;
     }
-    fn fatal(@self, m: ~str) -> ! {
+    fn fatal(&self, m: ~str) -> ! {
         self.sp_diag.span_fatal(self.cur_span.get(), m);
     }
-    fn span_diag(@self) -> @SpanHandler { self.sp_diag }
+    fn span_diag(&self) -> @SpanHandler { self.sp_diag }
     fn peek(@self) -> TokenAndSpan {
         TokenAndSpan {
             tok: self.cur_tok.get(),
             sp: self.cur_span.get(),
         }
     }
-    fn dup(@self) -> @Reader { dup_tt_reader(self) as @Reader }
+    fn dup(&self) -> @Reader { dup_tt_reader(self) as @Reader }
 }
 
 // report a lexical error spanning [`from_pos`, `to_pos`)
-fn fatal_span(rdr: @StringReader,
+fn fatal_span(rdr: &StringReader,
               from_pos: BytePos,
               to_pos: BytePos,
               m: ~str)
@@ -167,7 +167,7 @@ fn fatal_span(rdr: @StringReader,
 
 // report a lexical error spanning [`from_pos`, `to_pos`), appending an
 // escaped character to the error message
-fn fatal_span_char(rdr: @StringReader,
+fn fatal_span_char(rdr: &StringReader,
                    from_pos: BytePos,
                    to_pos: BytePos,
                    m: ~str,
@@ -181,7 +181,7 @@ fn fatal_span_char(rdr: @StringReader,
 
 // report a lexical error spanning [`from_pos`, `to_pos`), appending the
 // offending string to the error message
-fn fatal_span_verbose(rdr: @StringReader,
+fn fatal_span_verbose(rdr: &StringReader,
                       from_pos: BytePos,
                       to_pos: BytePos,
                       m: ~str)
