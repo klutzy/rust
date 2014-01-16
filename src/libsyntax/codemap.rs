@@ -298,7 +298,23 @@ impl CodeMap {
 
     /// Lookup source information about a BytePos
     pub fn lookup_char_pos(&self, pos: BytePos) -> Loc {
-        return self.lookup_pos(pos);
+        let FileMapAndLine {fm: f, line: a} = self.lookup_line(pos);
+        let line = a + 1u; // Line numbers start at 1
+        let chpos = self.bytepos_to_local_charpos(pos);
+        let mut lines = f.lines.borrow_mut();
+        let linebpos = lines.get()[a];
+        let linechpos = self.bytepos_to_local_charpos(linebpos);
+        debug!("codemap: byte pos {:?} is on the line at byte pos {:?}",
+               pos, linebpos);
+        debug!("codemap: char pos {:?} is on the line at char pos {:?}",
+               chpos, linechpos);
+        debug!("codemap: byte is on line: {:?}", line);
+        assert!(chpos >= linechpos);
+        return Loc {
+            file: f,
+            line: line,
+            col: chpos - linechpos
+        };
     }
 
     pub fn lookup_char_pos_adj(&self, pos: BytePos) -> LocWithOpt {
@@ -407,26 +423,6 @@ impl CodeMap {
             if lines.get()[m] > pos { b = m; } else { a = m; }
         }
         return FileMapAndLine {fm: f, line: a};
-    }
-
-    fn lookup_pos(&self, pos: BytePos) -> Loc {
-        let FileMapAndLine {fm: f, line: a} = self.lookup_line(pos);
-        let line = a + 1u; // Line numbers start at 1
-        let chpos = self.bytepos_to_local_charpos(pos);
-        let mut lines = f.lines.borrow_mut();
-        let linebpos = lines.get()[a];
-        let linechpos = self.bytepos_to_local_charpos(linebpos);
-        debug!("codemap: byte pos {:?} is on the line at byte pos {:?}",
-               pos, linebpos);
-        debug!("codemap: char pos {:?} is on the line at char pos {:?}",
-               chpos, linechpos);
-        debug!("codemap: byte is on line: {:?}", line);
-        assert!(chpos >= linechpos);
-        return Loc {
-            file: f,
-            line: line,
-            col: chpos - linechpos
-        };
     }
 
     fn lookup_byte_offset(&self, bpos: BytePos)
