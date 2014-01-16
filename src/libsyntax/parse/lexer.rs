@@ -355,7 +355,7 @@ fn consume_any_line_comment(rdr: &StringReader) -> Option<TokenAndSpan> {
                 let mut files = cmap.files.borrow_mut();
                 files.get().push(rdr.filemap);
             }
-            let loc = cmap.lookup_char_pos_adj(rdr.last_pos.get());
+            let loc = cmap.lookup_char_pos(rdr.last_pos.get());
             if loc.line == 1u && loc.col == CharPos(0) {
                 while rdr.curr.get() != '\n' && !is_eof(rdr) { bump(rdr); }
                 return consume_whitespace_and_comments(rdr);

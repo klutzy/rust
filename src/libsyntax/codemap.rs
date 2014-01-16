@@ -146,16 +146,6 @@ pub struct Loc {
     col: CharPos
 }
 
-/// A source code location used as the result of lookup_char_pos_adj
-// Actually, *none* of the clients use the filename *or* file field;
-// perhaps they should just be removed.
-pub struct LocWithOpt {
-    filename: FileName,
-    line: uint,
-    col: CharPos,
-    file: Option<@FileMap>,
-}
-
 // used to be structural records. Better names, anyone?
 pub struct FileMapAndLine {fm: @FileMap, line: uint}
 pub struct FileMapAndBytePos {fm: @FileMap, pos: BytePos}
@@ -317,16 +307,6 @@ impl CodeMap {
         };
     }
 
-    pub fn lookup_char_pos_adj(&self, pos: BytePos) -> LocWithOpt {
-        let loc = self.lookup_char_pos(pos);
-        LocWithOpt {
-            filename: loc.file.name,
-            line: loc.line,
-            col: loc.col,
-            file: Some(loc.file)
-        }
-    }
-
     pub fn adjust_span(&self, sp: Span) -> Span {
         sp
     }
@@ -339,9 +319,9 @@ impl CodeMap {
             }
         }
 
-        let lo = self.lookup_char_pos_adj(sp.lo);
-        let hi = self.lookup_char_pos_adj(sp.hi);
-        return format!("{}:{}:{}: {}:{}", lo.filename,
+        let lo = self.lookup_char_pos(sp.lo);
+        let hi = self.lookup_char_pos(sp.hi);
+        return format!("{}:{}:{}: {}:{}", lo.file.name,
                        lo.line, lo.col.to_uint() + 1, hi.line, hi.col.to_uint() + 1)
     }
 
