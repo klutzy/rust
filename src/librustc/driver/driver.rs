@@ -911,8 +911,7 @@ pub fn build_session_(sopts: @session::Options,
                       span_diagnostic_handler: @diagnostic::SpanHandler)
                       -> Session {
     let target_cfg = build_target_config(sopts, demitter);
-    let p_s = parse::new_parse_sess_special_handler(span_diagnostic_handler,
-                                                    cm);
+    let p_s = parse::new_parse_sess_special_handler(span_diagnostic_handler);
     let cstore = @CStore::new(token::get_ident_interner());
     let filesearch = @filesearch::FileSearch::new(
         &sopts.maybe_sysroot,

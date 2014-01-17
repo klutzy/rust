@@ -109,7 +109,7 @@ pub fn expand_include_str(cx: &mut ExtCtxt, sp: Span, tts: &[ast::TokenTree])
             // dependency information
             let src = src.to_managed();
             let filename = file.display().to_str().to_managed();
-            cx.parse_sess.cm.new_filemap(filename, src);
+            cx.parse_sess.span_diagnostic.cm.new_filemap(filename, src);
 
             base::MRExpr(cx.expr_str(sp, src))
         }

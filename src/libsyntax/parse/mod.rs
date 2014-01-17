@@ -13,7 +13,6 @@
 
 use ast;
 use codemap::{Span, CodeMap, FileMap};
-use codemap;
 use diagnostic::{SpanHandler, mk_span_handler, mk_handler, Emitter};
 use parse::attr::ParserAttr;
 use parse::parser::Parser;
@@ -40,7 +39,6 @@ pub mod obsolete;
 
 // info about a parsing session.
 pub struct ParseSess {
-    cm: @codemap::CodeMap, // better be the same as the one in the reader!
     span_diagnostic: @SpanHandler, // better be the same as the one in the reader!
     /// Used to determine and report recursive mod inclusions
     included_mod_stack: RefCell<~[Path]>,
@@ -49,17 +47,13 @@ pub struct ParseSess {
 pub fn new_parse_sess(demitter: Option<@Emitter>) -> @ParseSess {
     let cm = @CodeMap::new();
     @ParseSess {
-        cm: cm,
         span_diagnostic: mk_span_handler(mk_handler(demitter), cm),
         included_mod_stack: RefCell::new(~[]),
     }
 }
 
-pub fn new_parse_sess_special_handler(sh: @SpanHandler,
-                                      cm: @codemap::CodeMap)
-                                      -> @ParseSess {
+pub fn new_parse_sess_special_handler(sh: @SpanHandler) -> @ParseSess {
     @ParseSess {
-        cm: cm,
         span_diagnostic: sh,
         included_mod_stack: RefCell::new(~[]),
     }
@@ -262,7 +256,7 @@ pub fn file_to_filemap(sess: @ParseSess, path: &Path, spanopt: Option<Span>)
 // the session's codemap and return the new filemap
 pub fn string_to_filemap(sess: @ParseSess, source: @str, path: @str)
     -> @FileMap {
-    sess.cm.new_filemap(path, source)
+    sess.span_diagnostic.cm.new_filemap(path, source)
 }
 
 // given a filemap, produce a sequence of token-trees

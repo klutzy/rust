@@ -376,7 +376,7 @@ fn trans_fail_value<'a>(
     let (V_filename, V_line) = match sp_opt {
       Some(sp) => {
         let sess = bcx.sess();
-        let loc = sess.parse_sess.cm.lookup_char_pos(sp.lo);
+        let loc = sess.parse_sess.span_diagnostic.cm.lookup_char_pos(sp.lo);
         (C_cstr(bcx.ccx(), loc.file.name),
          loc.line as int)
       }
