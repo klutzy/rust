@@ -3244,10 +3244,7 @@ impl Resolver {
         let mut imports = module_.imports.borrow_mut();
         let import_count = imports.get().len();
         if index != import_count {
-            let sn = self.session
-                         .codemap
-                         .span_to_snippet(imports.get()[index].span)
-                         .unwrap();
+            let sn = self.session.codemap().span_to_snippet(imports.get()[index].span).unwrap();
             if sn.contains("::") {
                 self.resolve_error(imports.get()[index].span,
                                    "unresolved import");

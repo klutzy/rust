@@ -933,7 +933,7 @@ pub fn invoke<'a>(
         None => debug!("invoke at ???"),
         Some(node_info) => {
             debug!("invoke at {}",
-                   bcx.sess().codemap.span_to_str(node_info.span));
+                   bcx.sess().codemap().span_to_str(node_info.span));
         }
     }
 

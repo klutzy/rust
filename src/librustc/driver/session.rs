@@ -200,7 +200,6 @@ pub struct Session_ {
     opts: @Options,
     cstore: @metadata::cstore::CStore,
     parse_sess: @ParseSess,
-    codemap: @codemap::CodeMap,
     // For a library crate, this is always none
     entry_fn: RefCell<Option<(NodeId, codemap::Span)>>,
     entry_type: Cell<Option<EntryFnType>>,
@@ -218,6 +217,12 @@ pub struct Session_ {
 pub type Session = @Session_;
 
 impl Session_ {
+    pub fn codemap<'a> (&'a self) -> &'a codemap::CodeMap {
+        // TODO
+        let cm: &codemap::CodeMap = self.parse_sess.span_diagnostic.cm;
+        cm
+    }
+
     pub fn span_fatal(&self, sp: Span, msg: &str) -> ! {
         self.span_diagnostic.span_fatal(sp, msg)
     }

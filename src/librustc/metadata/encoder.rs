@@ -939,7 +939,7 @@ fn encode_info_for_item(ecx: &EncodeContext,
     let add_to_index: || = || add_to_index(item, ebml_w, index);
 
     debug!("encoding info for item at {}",
-           ecx.tcx.sess.codemap.span_to_str(item.span));
+           ecx.tcx.sess.codemap().span_to_str(item.span));
 
     let def_id = local_def(item.id);
     match item.node {

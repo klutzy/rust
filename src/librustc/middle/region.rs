@@ -326,7 +326,7 @@ impl RegionMaps {
 fn parent_to_expr(visitor: &mut RegionResolutionVisitor,
                   cx: Context, child_id: ast::NodeId, sp: Span) {
     debug!("region::parent_to_expr(span={:?})",
-           visitor.sess.codemap.span_to_str(sp));
+           visitor.sess.codemap().span_to_str(sp));
     for parent_id in cx.parent.iter() {
         visitor.region_maps.record_parent(child_id, *parent_id);
     }
@@ -444,7 +444,7 @@ fn resolve_fn(visitor: &mut RegionResolutionVisitor,
                                body.id={:?}, \
                                cx.parent={:?})",
            id,
-           visitor.sess.codemap.span_to_str(sp),
+           visitor.sess.codemap().span_to_str(sp),
            body.id,
            cx.parent);
 

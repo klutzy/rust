@@ -556,7 +556,7 @@ pub fn set_source_location(fcx: &FunctionContext,
 
     let cx = fcx.ccx;
 
-    debug!("set_source_location: {}", cx.sess.codemap.span_to_str(span));
+    debug!("set_source_location: {}", cx.sess.codemap().span_to_str(span));
 
     if fcx.debug_context.get_ref(cx, span).source_locations_enabled.get() {
         let loc = span_start(cx, span);
@@ -2257,7 +2257,7 @@ fn generate_unique_type_id(prefix: &'static str) -> ~str {
 
 /// Return codemap::Loc corresponding to the beginning of the span
 fn span_start(cx: &CrateContext, span: Span) -> codemap::Loc {
-    cx.sess.codemap.lookup_char_pos(span.lo)
+    cx.sess.codemap().lookup_char_pos(span.lo)
 }
 
 fn size_and_align_of(cx: &CrateContext, llvm_type: Type) -> (uint, uint) {
@@ -2369,7 +2369,7 @@ fn populate_scope_map(cx: &CrateContext,
                                    &mut ~[ScopeStackEntry],
                                    &mut HashMap<ast::NodeId, DIScope>|) {
         // Create a new lexical scope and push it onto the stack
-        let loc = cx.sess.codemap.lookup_char_pos(scope_span.lo);
+        let loc = cx.sess.codemap().lookup_char_pos(scope_span.lo);
         let file_metadata = file_metadata(cx, loc.file.name);
         let parent_scope = scope_stack.last().scope_metadata;
 
@@ -2485,7 +2485,7 @@ fn populate_scope_map(cx: &CrateContext,
 
                     if need_new_scope {
                         // Create a new lexical scope and push it onto the stack
-                        let loc = cx.sess.codemap.lookup_char_pos(pat.span.lo);
+                        let loc = cx.sess.codemap().lookup_char_pos(pat.span.lo);
                         let file_metadata = file_metadata(cx, loc.file.name);
                         let parent_scope = scope_stack.last().scope_metadata;
 

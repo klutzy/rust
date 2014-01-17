@@ -476,7 +476,7 @@ fn write_out_deps(sess: Session, input: &Input, outputs: &OutputFilenames, crate
     // Build a list of files used to compile the output and
     // write Makefile-compatible dependency rules
     let files: ~[@str] = {
-        let files = sess.codemap.files.borrow();
+        let files = sess.codemap().files.borrow();
         files.get()
              .iter()
              .filter_map(|fmap| {
@@ -616,11 +616,10 @@ pub fn pretty_print_input(sess: Session,
         _ => @pprust::NoAnn as @pprust::PpAnn,
     };
 
-    let src = sess.codemap.get_filemap(source_name(input)).src;
+    let src = sess.codemap().get_filemap(source_name(input)).src;
     let mut rdr = MemReader::new(src.as_bytes().to_owned());
     let stdout = io::stdout();
-    pprust::print_crate(sess.codemap,
-                        token::get_ident_interner(),
+    pprust::print_crate(token::get_ident_interner(),
                         sess.span_diagnostic,
                         &crate,
                         source_name(input),
@@ -902,11 +901,10 @@ pub fn build_session(sopts: @session::Options, demitter: @diagnostic::Emitter)
         diagnostic::mk_handler(Some(demitter));
     let span_diagnostic_handler =
         diagnostic::mk_span_handler(diagnostic_handler, codemap);
-    build_session_(sopts, codemap, demitter, span_diagnostic_handler)
+    build_session_(sopts, demitter, span_diagnostic_handler)
 }
 
 pub fn build_session_(sopts: @session::Options,
-                      cm: @codemap::CodeMap,
                       demitter: @diagnostic::Emitter,
                       span_diagnostic_handler: @diagnostic::SpanHandler)
                       -> Session {
@@ -922,7 +920,6 @@ pub fn build_session_(sopts: @session::Options,
         opts: sopts,
         cstore: cstore,
         parse_sess: p_s,
-        codemap: cm,
         // For a library crate, this is always none
         entry_fn: RefCell::new(None),
         entry_type: Cell::new(None),

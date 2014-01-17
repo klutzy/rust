@@ -113,8 +113,7 @@ pub static default_columns: uint = 78u;
 // Requires you to pass an input filename and reader so that
 // it can scan the input text for comments and literals to
 // copy forward.
-pub fn print_crate(cm: @CodeMap,
-                   intr: @IdentInterner,
+pub fn print_crate(intr: @IdentInterner,
                    span_diagnostic: @diagnostic::SpanHandler,
                    crate: &ast::Crate,
                    filename: @str,
@@ -129,7 +128,7 @@ pub fn print_crate(cm: @CodeMap,
     );
     let mut s = State {
         s: pp::mk_printer(out, default_columns),
-        cm: Some(cm),
+        cm: Some(span_diagnostic.cm),
         intr: intr,
         comments: Some(cmnts),
         // If the code is post expansion, don't use the table of
