@@ -350,7 +350,7 @@ fn consume_any_line_comment(rdr: &StringReader) -> Option<TokenAndSpan> {
         if nextch(rdr) == '!' {
             // I guess this is the only way to figure out if
             // we're at the beginning of the file...
-            let cmap = @CodeMap::new();
+            let cmap = CodeMap::new();
             {
                 let mut files = cmap.files.borrow_mut();
                 files.get().push(rdr.filemap);
@@ -969,7 +969,7 @@ mod test {
         let cm = CodeMap::new();
         let fm = cm.new_filemap(@"zebra.rs", teststr);
         let span_handler =
-            diagnostic::mk_span_handler(diagnostic::mk_handler(None),@cm);
+            diagnostic::mk_span_handler(diagnostic::mk_handler(None), cm);
         Env {
             string_reader: new_string_reader(span_handler,fm)
         }

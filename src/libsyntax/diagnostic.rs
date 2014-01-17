@@ -32,23 +32,23 @@ pub trait Emitter {
 // reporting.
 pub struct SpanHandler {
     handler: @Handler,
-    cm: @codemap::CodeMap,
+    cm: codemap::CodeMap,
 }
 
 impl SpanHandler {
     pub fn span_fatal(@self, sp: Span, msg: &str) -> ! {
-        self.handler.emit(Some((&*self.cm, sp)), msg, Fatal);
+        self.handler.emit(Some((&self.cm, sp)), msg, Fatal);
         fail!();
     }
     pub fn span_err(@self, sp: Span, msg: &str) {
-        self.handler.emit(Some((&*self.cm, sp)), msg, Error);
+        self.handler.emit(Some((&self.cm, sp)), msg, Error);
         self.handler.bump_err_count();
     }
     pub fn span_warn(@self, sp: Span, msg: &str) {
-        self.handler.emit(Some((&*self.cm, sp)), msg, Warning);
+        self.handler.emit(Some((&self.cm, sp)), msg, Warning);
     }
     pub fn span_note(@self, sp: Span, msg: &str) {
-        self.handler.emit(Some((&*self.cm, sp)), msg, Note);
+        self.handler.emit(Some((&self.cm, sp)), msg, Note);
     }
     pub fn span_bug(@self, sp: Span, msg: &str) -> ! {
         self.span_fatal(sp, ice_msg(msg));
@@ -124,7 +124,7 @@ pub fn ice_msg(msg: &str) -> ~str {
             \nWe would appreciate a bug report: {}", msg, BUG_REPORT_URL)
 }
 
-pub fn mk_span_handler(handler: @Handler, cm: @codemap::CodeMap)
+pub fn mk_span_handler(handler: @Handler, cm: codemap::CodeMap)
                        -> @SpanHandler {
     @SpanHandler {
         handler: handler,

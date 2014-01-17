@@ -35,11 +35,11 @@ use std::io;
 use std::io::mem::MemWriter;
 
 // The &mut State is stored here to prevent recursive type.
-pub enum AnnNode<'a,'b> {
-    NodeBlock(&'b mut State, &'a ast::Block),
-    NodeItem(&'b mut State, &'a ast::Item),
-    NodeExpr(&'b mut State, &'a ast::Expr),
-    NodePat(&'b mut State, &'a ast::Pat),
+pub enum AnnNode<'a, 'b, 'c> {
+    NodeBlock(&'b mut State<'c>, &'a ast::Block),
+    NodeItem(&'b mut State<'c>, &'a ast::Item),
+    NodeExpr(&'b mut State<'c>, &'a ast::Expr),
+    NodePat(&'b mut State<'c>, &'a ast::Pat),
 }
 
 pub trait PpAnn {
@@ -56,9 +56,9 @@ pub struct CurrentCommentAndLiteral {
     cur_lit: uint,
 }
 
-pub struct State {
+pub struct State<'a> {
     s: pp::Printer,
-    cm: Option<@CodeMap>,
+    cm: Option<&'a CodeMap>,
     intr: @token::IdentInterner,
     comments: Option<~[comments::Comment]>,
     literals: Option<~[comments::Literal]>,
@@ -128,7 +128,7 @@ pub fn print_crate(intr: @IdentInterner,
     );
     let mut s = State {
         s: pp::mk_printer(out, default_columns),
-        cm: Some(span_diagnostic.cm),
+        cm: Some(&span_diagnostic.cm),
         intr: intr,
         comments: Some(cmnts),
         // If the code is post expansion, don't use the table of
@@ -146,12 +146,8 @@ pub fn print_crate(intr: @IdentInterner,
         boxes: RefCell::new(~[]),
         ann: ann
     };
-    print_crate_(&mut s, crate);
-}
-
-pub fn print_crate_(s: &mut State, crate: &ast::Crate) {
-    print_mod(s, &crate.module, crate.attrs);
-    print_remaining_comments(s);
+    print_mod(&mut s, &crate.module, crate.attrs);
+    print_remaining_comments(&mut s);
     eof(&mut s.s);
 }
 

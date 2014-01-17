@@ -1365,28 +1365,12 @@ mod test {
         }
     }
 
-    //fn fake_print_crate(crate: &ast::Crate) {
-    //    let mut out = ~std::io::stderr() as ~std::io::Writer;
-    //    let mut s = pprust::rust_printer(out, get_ident_interner());
-    //    pprust::print_crate_(&mut s, crate);
-    //}
-
     fn expand_crate_str(crate_str: @str) -> ast::Crate {
         let (crate_ast,ps) = string_to_crate_and_sess(crate_str);
         // the cfg argument actually does matter, here...
         let mut loader = ErrLoader;
         expand_crate(ps,&mut loader,~[],crate_ast)
     }
-
-    //fn expand_and_resolve(crate_str: @str) -> ast::crate {
-        //let expanded_ast = expand_crate_str(crate_str);
-        // println!("expanded: {:?}\n",expanded_ast);
-        //mtwt_resolve_crate(expanded_ast)
-    //}
-    //fn expand_and_resolve_and_pretty_print (crate_str : @str) -> ~str {
-        //let resolved_ast = expand_and_resolve(crate_str);
-        //pprust::to_str(&resolved_ast,fake_print_crate,get_ident_interner())
-    //}
 
     #[test] fn macro_tokens_should_match(){
         expand_crate_str(@"macro_rules! m((a)=>(13)) fn main(){m!(a);}");

@@ -45,7 +45,7 @@ pub struct ParseSess {
 }
 
 pub fn new_parse_sess(demitter: Option<@Emitter>) -> @ParseSess {
-    let cm = @CodeMap::new();
+    let cm = CodeMap::new();
     @ParseSess {
         span_diagnostic: mk_span_handler(mk_handler(demitter), cm),
         included_mod_stack: RefCell::new(~[]),

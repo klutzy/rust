@@ -333,7 +333,7 @@ impl<'a> ExtCtxt<'a> {
         }
     }
 
-    pub fn codemap(&self) -> @CodeMap { self.parse_sess.span_diagnostic.cm }
+    pub fn codemap<'a>(&'a self) -> &'a CodeMap { &self.parse_sess.span_diagnostic.cm }
     pub fn parse_sess(&self) -> @parse::ParseSess { self.parse_sess }
     pub fn cfg(&self) -> ast::CrateConfig { self.cfg.clone() }
     pub fn call_site(&self) -> Span {
