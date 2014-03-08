@@ -145,14 +145,22 @@ pub fn register_foreign_item_fn(ccx: @CrateContext, abis: AbiSet,
     let llfn;
     {
         let mut externs = ccx.externs.borrow_mut();
-        llfn = base::get_extern_fn(externs.get(),
+        let externs = externs.get();
+        let name = lname.get();
+        let fn_exists = externs.contains_key_equiv(&name);
+        llfn = base::get_extern_fn(externs,
                                    ccx.llmod,
-                                   lname.get(),
+                                   name,
                                    cc,
                                    llfn_ty,
                                    tys.fn_sig.output);
+        if !fn_exists {
+            // if function is already declared before get_extern_fn, it is bad to add attributes
+            // because the declared one may have different signature. (see also #12707)
+            // Add attributes only if they are declared just now.
+            add_argument_attributes(&tys, llfn);
+        }
     };
-    add_argument_attributes(&tys, llfn);
 
     llfn
 }
