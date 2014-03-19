@@ -3558,6 +3558,7 @@ pub mod funcs {
             use types::os::arch::c95::{c_int, c_uint, c_char,
                                              c_long, size_t};
             use types::os::arch::c99::intptr_t;
+            use types::os::arch::posix88::ssize_t;
 
             extern {
                 #[link_name = "_access"]
@@ -3593,14 +3594,19 @@ pub mod funcs {
                 pub fn pipe(fds: *mut c_int, psize: c_uint, textmode: c_int)
                             -> c_int;
                 #[link_name = "_read"]
-                pub fn read(fd: c_int, buf: *mut c_void, count: c_uint)
-                            -> c_int;
+                fn _read(fd: c_int, buf: *mut c_void, count: c_uint) -> c_int;
                 #[link_name = "_rmdir"]
                 pub fn rmdir(path: *c_char) -> c_int;
                 #[link_name = "_unlink"]
                 pub fn unlink(c: *c_char) -> c_int;
                 #[link_name = "_write"]
-                pub fn write(fd: c_int, buf: *c_void, count: c_uint) -> c_int;
+                fn _write(fd: c_int, buf: *c_void, count: c_uint) -> c_int;
+            }
+            pub unsafe fn read(fd: c_int, buf: *mut c_void, count: size_t) -> ssize_t {
+                _read(fd, buf, count as c_uint) as ssize_t
+            }
+            pub unsafe fn write(fd: c_int, buf: *c_void, count: size_t) -> ssize_t {
+                _write(fd, buf, count as c_uint) as ssize_t
             }
         }
 

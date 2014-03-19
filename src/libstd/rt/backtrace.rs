@@ -661,6 +661,88 @@ mod imp {
         }
     }
 
+    #[cfg(target_arch = "x86_64")]
+    mod arch {
+        use libc;
+
+        pub struct CONTEXT {
+            P1Home: libc::DWORDLONG,
+            P2Home: libc::DWORDLONG,
+            P3Home: libc::DWORDLONG,
+            P4Home: libc::DWORDLONG,
+            P5Home: libc::DWORDLONG,
+            P6Home: libc::DWORDLONG,
+
+            ContextFlags: libc::DWORD,
+            MxCsr: libc::DWORD,
+
+            SegCs: libc::WORD,
+            SegDs: libc::WORD,
+            SegEs: libc::WORD,
+            SegFs: libc::WORD,
+            SegGs: libc::WORD,
+            SegSs: libc::WORD,
+            EFlags: libc::DWORD,
+
+            Dr0: libc::DWORDLONG,
+            Dr1: libc::DWORDLONG,
+            Dr2: libc::DWORDLONG,
+            Dr3: libc::DWORDLONG,
+            Dr6: libc::DWORDLONG,
+            Dr7: libc::DWORDLONG,
+
+            Rax: libc::DWORDLONG,
+            Rcx: libc::DWORDLONG,
+            Rdx: libc::DWORDLONG,
+            Rbx: libc::DWORDLONG,
+            Rsp: libc::DWORDLONG,
+            Rbp: libc::DWORDLONG,
+            Rsi: libc::DWORDLONG,
+            Rdi: libc::DWORDLONG,
+            R8:  libc::DWORDLONG,
+            R9:  libc::DWORDLONG,
+            R10: libc::DWORDLONG,
+            R11: libc::DWORDLONG,
+            R12: libc::DWORDLONG,
+            R13: libc::DWORDLONG,
+            R14: libc::DWORDLONG,
+            R15: libc::DWORDLONG,
+
+            Rip: libc::DWORDLONG,
+
+            FltSave: FLOATING_SAVE_AREA,
+
+            VectorRegister: [M128A, .. 26],
+            VectorControl: libc::DWORDLONG,
+
+            DebugControl: libc::DWORDLONG,
+            LastBranchToRip: libc::DWORDLONG,
+            LastBranchFromRip: libc::DWORDLONG,
+            LastExceptionToRip: libc::DWORDLONG,
+            LastExceptionFromRip: libc::DWORDLONG,
+        }
+
+        pub struct M128A {
+            Low:  libc::c_ulonglong,
+            High: libc::c_longlong
+        }
+
+        pub struct FLOATING_SAVE_AREA {
+            _Dummy: [u8, ..512] // FIXME: Fill this out
+        }
+
+        pub fn init_frame(frame: &mut super::STACKFRAME64,
+                          ctx: &CONTEXT) -> libc::DWORD {
+            frame.AddrPC.Offset = ctx.Rip as u64;
+            frame.AddrPC.Mode = super::AddrModeFlat;
+            frame.AddrStack.Offset = ctx.Rsp as u64;
+            frame.AddrStack.Mode = super::AddrModeFlat;
+            frame.AddrFrame.Offset = ctx.Rbp as u64;
+            frame.AddrFrame.Mode = super::AddrModeFlat;
+            super::IMAGE_FILE_MACHINE_AMD64
+        }
+    }
+
     struct Cleanup {
         handle: libc::HANDLE,
         SymCleanup: SymCleanupFn,
@@ -751,6 +833,7 @@ mod imp {
 mod test {
     use prelude::*;
     use io::MemWriter;
+    use mem;
     use str;
 
     macro_rules! t( ($a:expr, $b:expr) => ({
@@ -773,5 +856,11 @@ mod test {
         t!("_ZN8$UP$testE", "~test");
         t!("_ZN8$UP$test4foobE", "~test::foob");
         t!("_ZN8$x20test4foobE", " test::foob");
+    }
+
+    #[test]
+    #[cfg(target_arch = "x86_64")]
+    fn check_size() {
+        assert_eq!(mem::size_of::<super::imp::arch::CONTEXT>() == 1232);
     }
 }
