@@ -229,6 +229,8 @@ def curr_snapshot_rev():
 def determine_curr_snapshot(triple):
   i = 0
   platform = get_platform(triple)
+  if platform == "winnt-x86_64":
+    platform = "winnt-i386" # we don't ship win64 snapshot. use win32 version.
 
   found_file = False
   found_snap = False
