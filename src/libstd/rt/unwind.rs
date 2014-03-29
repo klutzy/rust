@@ -201,7 +201,7 @@ pub mod eabi {
     use libc::c_int;
 
     extern "C" {
-        fn __gcc_personality_v0(version: c_int,
+        fn __gcc_personality_seh0(version: c_int,
                                 actions: uw::_Unwind_Action,
                                 exception_class: uw::_Unwind_Exception_Class,
                                 ue_header: *uw::_Unwind_Exception,
@@ -220,7 +220,7 @@ pub mod eabi {
     ) -> uw::_Unwind_Reason_Code
     {
         unsafe {
-            __gcc_personality_v0(version, actions, exception_class, ue_header,
+            __gcc_personality_seh0(version, actions, exception_class, ue_header,
                                  context)
         }
     }
@@ -239,7 +239,7 @@ pub mod eabi {
         }
         else { // cleanup phase
             unsafe {
-                 __gcc_personality_v0(version, actions, exception_class, ue_header,
+                 __gcc_personality_seh0(version, actions, exception_class, ue_header,
                                       context)
             }
         }
