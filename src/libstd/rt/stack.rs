@@ -117,21 +117,26 @@ pub unsafe fn record_stack_bounds(stack_lo: uint, stack_hi: uint) {
     // calculations up to the nice round number of 20k.
     record_sp_limit(stack_lo + RED_ZONE);
 
-    return target_record_stack_bounds(stack_lo, stack_hi);
+    // Windows compiles C functions which may check the stack bounds. This
+    // means that if we want to perform valid FFI on windows, then we need
+    // to ensure that the stack bounds are what they truly are for this
+    // task. More info can be found at:
+    //   https://github.com/mozilla/rust/issues/3445#issuecomment-26114839
+    //
+    // Stack bottom (limit) is already set by `record_sp_limit() above.
+    // We need to set top: %fs:0x04 on win32, %gs:0x08 on win64
+    return target_record_stack_base(stack_hi);
 
-    #[cfg(not(windows))] #[cfg(not(target_arch = "x86_64"))] #[inline(always)]
-    unsafe fn target_record_stack_bounds(_stack_lo: uint, _stack_hi: uint) {}
+    #[cfg(not(windows))] #[inline(always)]
+    unsafe fn target_record_stack_base(stack_hi: uint) {}
+
+    #[cfg(windows, target_arch = "x86")] #[inline(always)]
+    unsafe fn target_record_stack_base(stack_hi: uint) {
+        asm!("mov $0, %fs:0x04" :: "r"(stack_hi) :: "volatile");
+    }
     #[cfg(windows, target_arch = "x86_64")] #[inline(always)]
-    unsafe fn target_record_stack_bounds(stack_lo: uint, stack_hi: uint) {
-        // Windows compiles C functions which may check the stack bounds. This
-        // means that if we want to perform valid FFI on windows, then we need
-        // to ensure that the stack bounds are what they truly are for this
-        // task. More info can be found at:
-        //   https://github.com/mozilla/rust/issues/3445#issuecomment-26114839
-        //
-        // stack range is at TIB: %gs:0x08 (top) and %gs:0x10 (bottom)
+    unsafe fn target_record_stack_base(stack_hi: uint) {
         asm!("mov $0, %gs:0x08" :: "r"(stack_hi) :: "volatile");
-        asm!("mov $0, %gs:0x10" :: "r"(stack_lo) :: "volatile");
     }
 }
 
@@ -166,9 +171,10 @@ pub unsafe fn record_sp_limit(limit: uint) {
     #[cfg(target_arch = "x86_64", target_os = "win32")] #[inline(always)]
     unsafe fn target_record_sp_limit(limit: uint) {
         // see: http://en.wikipedia.org/wiki/Win32_Thread_Information_Block
-        // store this inside of the "arbitrary data slot", but double the size
+        // store this inside of the "bottom on stack" or "stack limit"
+        // Note that win64 uses GS register and the offset is doubled
         // because this is 64 bit instead of 32 bit
-        asm!("movq $0, %gs:0x28" :: "r"(limit) :: "volatile")
+        asm!("movq $0, %gs:0x10" :: "r"(limit) :: "volatile")
     }
     #[cfg(target_arch = "x86_64", target_os = "freebsd")] #[inline(always)]
     unsafe fn target_record_sp_limit(limit: uint) {
@@ -189,8 +195,8 @@ pub unsafe fn record_sp_limit(limit: uint) {
     #[cfg(target_arch = "x86", target_os = "win32")] #[inline(always)]
     unsafe fn target_record_sp_limit(limit: uint) {
         // see: http://en.wikipedia.org/wiki/Win32_Thread_Information_Block
-        // store this inside of the "arbitrary data slot"
-        asm!("movl $0, %fs:0x14" :: "r"(limit) :: "volatile")
+        // store this inside of the "bottom on stack" or "stack limit"
+        asm!("movl $0, %fs:0x08" :: "r"(limit) :: "volatile")
     }
 
     // mips, arm - Some brave soul can port these to inline asm, but it's over
@@ -263,7 +269,7 @@ pub unsafe fn get_sp_limit() -> uint {
     #[cfg(target_arch = "x86", target_os = "win32")] #[inline(always)]
     unsafe fn target_get_sp_limit() -> uint {
         let limit;
-        asm!("movl %fs:0x14, $0" : "=r"(limit) ::: "volatile");
+        asm!("movl %fs:0x08, $0" : "=r"(limit) ::: "volatile");
         return limit;
     }
 
