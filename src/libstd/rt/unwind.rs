@@ -55,6 +55,8 @@
 //
 // Currently Rust uses unwind runtime provided by libgcc.
 
+#![allow(uppercase_variables, non_camel_case_types)]
+
 use any::{Any, AnyRefExt};
 use c_str::CString;
 use cast;
@@ -193,7 +195,8 @@ fn rust_exception_class() -> uw::_Unwind_Exception_Class {
 //   This is achieved by overriding the return value in search phase to always
 //   say "catch!".
 
-#[cfg(not(target_arch = "arm"), not(test))]
+#[cfg(not(windows), not(target_arch = "arm"), not(test))]
+#[cfg(windows, not(target_arch = "x86_64"), not(test))]
 #[doc(hidden)]
 #[allow(visible_private_types)]
 pub mod eabi {
@@ -201,7 +204,7 @@ pub mod eabi {
     use libc::c_int;
 
     extern "C" {
-        fn __gcc_personality_seh0(version: c_int,
+        fn __gcc_personality_v0(version: c_int,
                                 actions: uw::_Unwind_Action,
                                 exception_class: uw::_Unwind_Exception_Class,
                                 ue_header: *uw::_Unwind_Exception,
@@ -220,7 +223,7 @@ pub mod eabi {
     ) -> uw::_Unwind_Reason_Code
     {
         unsafe {
-            __gcc_personality_seh0(version, actions, exception_class, ue_header,
+            __gcc_personality_v0(version, actions, exception_class, ue_header,
                                  context)
         }
     }
@@ -239,9 +242,59 @@ pub mod eabi {
         }
         else { // cleanup phase
             unsafe {
-                 __gcc_personality_seh0(version, actions, exception_class, ue_header,
+                 __gcc_personality_v0(version, actions, exception_class, ue_header,
                                       context)
             }
+        }
+    }
+}
+
+#[cfg(windows, target_arch = "x86_64", not(test))]
+#[doc(hidden)]
+#[allow(visible_private_types)]
+pub mod eabi {
+    //use uw = rt::libunwind;
+
+    use libc::DWORD;
+
+    //type EXCEPTION_DISPOSITION = i32;
+    extern "C" {
+        fn __gcc_personality_seh0(ms_exc: *EXCEPTION_RECORD, // EXCEPTION_RECORD: opaque
+                                  this_frame: *(),
+                                  ms_orig_context: *(), // CONTEXT: opaque
+                                  ms_disp: *(), // DISPATCHER_CONTEXT: opaque
+                                  ) -> i32; // EXCEPTION_DISPOSITION
+    }
+
+    pub struct EXCEPTION_RECORD {
+        ExceptionCode: DWORD,
+        ExceptionFlags: DWORD,
+        ExceptionRecord: *EXCEPTION_RECORD,
+        ExceptionAddress: *(),
+        NumberParameters: DWORD,
+        ExceptionInformation: *(),
+    }
+
+    #[lang="eh_personality"]
+    #[no_mangle] // so we can reference it by name from middle/trans/base.rs
+    pub extern "C" fn rust_eh_personality(
+        _ms_exc: *EXCEPTION_RECORD, _this_frame: *(), _ms_orig_context: *(), _ms_disp: *()
+    ) -> i32
+    {
+        println!("(p) ms_exc: {:?}", _ms_exc);
+        unsafe {
+            __gcc_personality_seh0(_ms_exc, _this_frame, _ms_orig_context, _ms_disp)
+        }
+    }
+
+    #[no_mangle] // referenced from rust_try.ll
+    pub extern "C" fn rust_eh_personality_catch(
+        _ms_exc: *EXCEPTION_RECORD, _this_frame: *(), _ms_orig_context: *(), _ms_disp: *()
+    ) -> i32
+    {
+        println!("(c) ms_exc: {:?}", _ms_exc);
+        unsafe {
+            __gcc_personality_seh0(_ms_exc, _this_frame, _ms_orig_context, _ms_disp)
         }
     }
 }
