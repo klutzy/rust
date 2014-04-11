@@ -34,10 +34,15 @@ pub fn dumb_println(args: &fmt::Arguments) {
     struct Stderr;
     impl io::Writer for Stderr {
         fn write(&mut self, data: &[u8]) -> io::IoResult<()> {
+            #![allow(non_camel_case_types)]
+            #[cfg(windows, target_arch="x86_64")]
+            type size_t = libc::c_uint;
+            #[cfg(not(windows))] #[cfg(not(target_arch="x86_64"))]
+            type size_t = libc::size_t;
             let _ = unsafe {
                 libc::write(libc::STDERR_FILENO,
                             data.as_ptr() as *libc::c_void,
-                            data.len() as libc::size_t)
+                            data.len() as size_t)
             };
             Ok(()) // just ignore the errors
         }
