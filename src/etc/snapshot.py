@@ -40,6 +40,7 @@ snapshot_files = {
     }
 
 winnt_runtime_deps = ["libgcc_s_dw2-1.dll",
+                      "libwinpthread-1.dll",
                       "libstdc++-6.dll"]
 
 def parse_line(n, line):

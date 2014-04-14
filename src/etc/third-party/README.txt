@@ -6,3 +6,7 @@ Specifically:
      or (at your option) any later version.  See the files COPYING3 and COPYING.RUNTIME respectively.
      You can obtain a copy of the source of these libraries either here: http://sourceforge.net/projects/mingw/files/MinGW/Base/gcc/Version4/gcc-4.5.2-1/,
      or from the project website at http://gcc.gnu.org
+
+   - libwinpthread-1.dll is distributed under the terms of MIT License and 3-BSD License.  See COPYING.WINPTHREADS file.
+     You can obtain a copy of the source of this library here:
+     http://sourceforge.net/p/mingw-w64/code/HEAD/tree/trunk/mingw-w64-libraries/winpthreads/src/
