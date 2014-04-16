@@ -148,31 +148,103 @@ impl<'a> fold::Folder for PreludeInjector<'a> {
     }
 
     fn fold_mod(&mut self, module: &ast::Mod) -> ast::Mod {
-        let prelude_path = ast::Path {
-            span: DUMMY_SP,
-            global: false,
-            segments: vec!(
-                ast::PathSegment {
-                    identifier: token::str_to_ident("std"),
-                    lifetimes: Vec::new(),
-                    types: OwnedSlice::empty(),
-                },
-                ast::PathSegment {
-                    identifier: token::str_to_ident("prelude"),
-                    lifetimes: Vec::new(),
-                    types: OwnedSlice::empty(),
-                }),
-        };
+        fn create_path_list(path: &[&str], idents: &[&str]) -> ast::ViewItem {
+            let base_path = ast::Path {
+                span: DUMMY_SP,
+                global: false,
+                segments: path.iter().map(|&s| {
+                    ast::PathSegment {
+                        identifier: token::str_to_ident(s),
+                        lifetimes: Vec::new(),
+                        types: OwnedSlice::empty(),
+                    }
+                }).collect(),
+            };
 
-        let vp = @codemap::dummy_spanned(ast::ViewPathGlob(prelude_path, ast::DUMMY_NODE_ID));
-        let vi2 = ast::ViewItem {
-            node: ast::ViewItemUse(vec!(vp)),
-            attrs: Vec::new(),
-            vis: ast::Inherited,
-            span: DUMMY_SP,
-        };
+            let idents: Vec<ast::PathListIdent> = idents.iter().map(|&s| {
+                let ident = ast::PathListIdent_ {
+                    name: token::str_to_ident(s),
+                    id: ast::DUMMY_NODE_ID,
+                };
+                codemap::dummy_spanned(ident)
+            }).collect();
 
-        let vis = (vec!(vi2)).append(module.view_items.as_slice());
+            let view_path_ = ast::ViewPathList(base_path, idents, ast::DUMMY_NODE_ID);
+            let view_path = @codemap::dummy_spanned(view_path_);
+            let view_item = ast::ViewItem {
+                node: ast::ViewItemUse(vec!(view_path)),
+                attrs: Vec::new(),
+                vis: ast::Inherited,
+                span: DUMMY_SP,
+            };
+            view_item
+        }
+
+        let preludes = [
+            // Reexported core operators
+            (&["std", "kinds"], &["Copy", "Send", "Sized", "Share"]),
+            (&["std", "ops"], &["Add", "Sub", "Mul", "Div", "Rem", "Neg", "Not"]),
+            (&["std", "ops"], &["BitAnd", "BitOr", "BitXor"]),
+            (&["std", "ops"], &["Drop", "Deref", "DerefMut"]),
+            (&["std", "ops"], &["Shl", "Shr", "Index"]),
+            (&["std", "option"], &["Option", "Some", "None"]),
+            (&["std", "result"], &["Result", "Ok", "Err"]),
+
+            // Reexported functions
+            (&["std", "from_str"], &["from_str"]),
+            (&["std", "iter"], &["range"]),
+            (&["std", "mem"], &["drop"]),
+
+            // Reexported types and traits
+            (&["std", "ascii"], &["Ascii", "AsciiCast", "OwnedAsciiCast", "AsciiStr", "IntoBytes"]),
+            (&["std", "c_str"], &["ToCStr"]),
+            (&["std", "char"], &["Char"]),
+            (&["std", "clone"], &["Clone"]),
+            (&["std", "cmp"], &["Eq", "Ord", "TotalEq", "TotalOrd", "Ordering", "Less", "Equal", "Greater", "Equiv"]),
+            (&["std", "container"], &["Container", "Mutable", "Map", "MutableMap", "Set", "MutableSet"]),
+            (&["std", "iter"], &["FromIterator", "Extendable"]),
+            (&["std", "iter"], &["Iterator", "DoubleEndedIterator", "RandomAccessIterator", "CloneableIterator"]),
+            (&["std", "iter"], &["OrdIterator", "MutableDoubleEndedIterator", "ExactSize"]),
+            (&["std", "num"], &["Num", "NumCast", "CheckedAdd", "CheckedSub", "CheckedMul"]),
+            (&["std", "num"], &["Signed", "Unsigned", "Round"]),
+            (&["std", "num"], &["Primitive", "Int", "Float", "ToPrimitive", "FromPrimitive"]),
+            (&["std", "path"], &["GenericPath", "Path", "PosixPath", "WindowsPath"]),
+            (&["std", "ptr"], &["RawPtr"]),
+            (&["std", "io"], &["Buffer", "Writer", "Reader", "Seek"]),
+            (&["std", "str"], &["Str", "StrVector", "StrSlice", "OwnedStr", "IntoMaybeOwned"]),
+            (&["std", "to_str"], &["ToStr", "IntoStr"]),
+            (&["std", "tuple"], &["Tuple1", "Tuple2", "Tuple3", "Tuple4"]),
+            (&["std", "tuple"], &["Tuple5", "Tuple6", "Tuple7", "Tuple8"]),
+            (&["std", "tuple"], &["Tuple9", "Tuple10", "Tuple11", "Tuple12"]),
+            (&["std", "slice"], &["ImmutableEqVector", "ImmutableTotalOrdVector", "ImmutableCloneableVector"]),
+            (&["std", "slice"], &["OwnedVector", "OwnedCloneableVector", "OwnedEqVector"]),
+            (&["std", "slice"], &["MutableVector", "MutableTotalOrdVector"]),
+            (&["std", "slice"], &["Vector", "VectorVector", "CloneableVector", "ImmutableVector"]),
+            (&["std", "strbuf"], &["StrBuf"]),
+            (&["std", "vec"], &["Vec"]),
+
+            // Reexported runtime types
+            (&["std", "comm"], &["sync_channel", "channel", "SyncSender", "Sender", "Receiver"]),
+            (&["std", "task"], &["spawn"]),
+
+            // no GC. :p
+        ];
+
+        let preludes = preludes.iter().map(|&(base_path, idents)| {
+            create_path_list(base_path, idents)
+        }).collect();
+
+        let (crates, uses) = module.view_items.partitioned(|x| {
+            match x.node {
+                ast::ViewItemExternCrate(..) => true,
+                _ => false,
+            }
+        });
+
+        // add preludes after any `extern crate` but before any `use`
+        let mut view_items = crates;
+        view_items.push_all_move(preludes);
+        view_items.push_all_move(uses);
 
         // FIXME #2543: Bad copy.
         let new_module = ast::Mod {
