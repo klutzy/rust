@@ -1949,16 +1949,20 @@ impl<'a> State<'a> {
             }
 
             ast::ViewPathList(ref path, ref idents, _) => {
-                if path.segments.is_empty() {
-                    try!(word(&mut self.s, "{"));
-                } else {
+                if !path.segments.is_empty() {
                     try!(self.print_path(path, false));
-                    try!(word(&mut self.s, "::{"));
+                    try!(word(&mut self.s, "::"));
+                }
+                if idents.len() > 1 {
+                    try!(word(&mut self.s, "{"));
                 }
                 try!(self.commasep(Inconsistent, idents.as_slice(), |s, w| {
                     s.print_ident(w.node.name)
                 }));
-                word(&mut self.s, "}")
+                if idents.len() > 1 {
+                    try!(word(&mut self.s, "}"));
+                }
+                Ok(())
             }
         }
     }
