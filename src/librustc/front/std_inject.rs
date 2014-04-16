@@ -24,6 +24,85 @@ use syntax::util::small_vector::SmallVector;
 
 pub static VERSION: &'static str = "0.11-pre";
 
+
+macro_rules! generate_prelude(
+    ($(pub use $path:ident::{ $($id:ident),+ };)+) => (
+        pub mod prelude {
+            /*!
+
+            The standard module imported by default into all Rust modules
+
+            Many programming languages have a 'prelude': a particular subset of the
+            libraries that come with the language. Every program imports the prelude by
+            default. The prelude imports various core parts of the library that are
+            generally useful to many Rust programs.
+
+            */
+
+            $(
+                pub use std::$path::{$($id),+};
+            )+
+        }
+
+        static PRELUDE_LIST: &'static [(&'static [&'static str], &'static [&'static str])] = &[
+            $(
+                (&["std", stringify!($path)], &[ $( stringify!($id) ),+ ]),
+            )+
+        ];
+    )
+)
+
+
+generate_prelude!(
+    // Reexported core operators
+    pub use kinds::{Copy, Send, Sized, Share};
+    pub use ops::{Add, Sub, Mul, Div, Rem, Neg, Not};
+    pub use ops::{BitAnd, BitOr, BitXor};
+    pub use ops::{Drop, Deref, DerefMut};
+    pub use ops::{Shl, Shr, Index};
+    pub use option::{Option, Some, None};
+    pub use result::{Result, Ok, Err};
+
+    // Reexported functions
+    pub use from_str::{from_str};
+    pub use iter::{range};
+    pub use mem::{drop};
+
+    // Reexported types and traits
+
+    pub use ascii::{Ascii, AsciiCast, OwnedAsciiCast, AsciiStr, IntoBytes};
+    pub use c_str::{ToCStr};
+    pub use char::{Char};
+    pub use clone::{Clone};
+    pub use cmp::{Eq, Ord, TotalEq, TotalOrd, Ordering, Less, Equal, Greater, Equiv};
+    pub use container::{Container, Mutable, Map, MutableMap, Set, MutableSet};
+    pub use iter::{FromIterator, Extendable};
+    pub use iter::{Iterator, DoubleEndedIterator, RandomAccessIterator, CloneableIterator};
+    pub use iter::{OrdIterator, MutableDoubleEndedIterator, ExactSize};
+    pub use num::{Num, NumCast, CheckedAdd, CheckedSub, CheckedMul};
+    pub use num::{Signed, Unsigned, Round};
+    pub use num::{Primitive, Int, Float, ToPrimitive, FromPrimitive};
+    pub use path::{GenericPath, Path, PosixPath, WindowsPath};
+    pub use ptr::{RawPtr};
+    pub use io::{Buffer, Writer, Reader, Seek};
+    pub use str::{Str, StrVector, StrSlice, OwnedStr, IntoMaybeOwned};
+    pub use to_str::{ToStr, IntoStr};
+    pub use tuple::{Tuple1, Tuple2, Tuple3, Tuple4};
+    pub use tuple::{Tuple5, Tuple6, Tuple7, Tuple8};
+    pub use tuple::{Tuple9, Tuple10, Tuple11, Tuple12};
+    pub use slice::{ImmutableEqVector, ImmutableTotalOrdVector, ImmutableCloneableVector};
+    pub use slice::{OwnedVector, OwnedCloneableVector, OwnedEqVector};
+    pub use slice::{MutableVector, MutableTotalOrdVector};
+    pub use slice::{Vector, VectorVector, CloneableVector, ImmutableVector};
+    pub use strbuf::{StrBuf};
+    pub use vec::{Vec};
+
+    // Reexported runtime types
+    pub use comm::{sync_channel, channel, SyncSender, Sender, Receiver};
+    pub use task::{spawn};
+
+)
+
 pub fn maybe_inject_crates_ref(sess: &Session, krate: ast::Crate)
                                -> ast::Crate {
     if use_std(&krate) {
@@ -180,57 +259,7 @@ impl<'a> fold::Folder for PreludeInjector<'a> {
             view_item
         }
 
-        let preludes = [
-            // Reexported core operators
-            (&["std", "kinds"], &["Copy", "Send", "Sized", "Share"]),
-            (&["std", "ops"], &["Add", "Sub", "Mul", "Div", "Rem", "Neg", "Not"]),
-            (&["std", "ops"], &["BitAnd", "BitOr", "BitXor"]),
-            (&["std", "ops"], &["Drop", "Deref", "DerefMut"]),
-            (&["std", "ops"], &["Shl", "Shr", "Index"]),
-            (&["std", "option"], &["Option", "Some", "None"]),
-            (&["std", "result"], &["Result", "Ok", "Err"]),
-
-            // Reexported functions
-            (&["std", "from_str"], &["from_str"]),
-            (&["std", "iter"], &["range"]),
-            (&["std", "mem"], &["drop"]),
-
-            // Reexported types and traits
-            (&["std", "ascii"], &["Ascii", "AsciiCast", "OwnedAsciiCast", "AsciiStr", "IntoBytes"]),
-            (&["std", "c_str"], &["ToCStr"]),
-            (&["std", "char"], &["Char"]),
-            (&["std", "clone"], &["Clone"]),
-            (&["std", "cmp"], &["Eq", "Ord", "TotalEq", "TotalOrd", "Ordering", "Less", "Equal", "Greater", "Equiv"]),
-            (&["std", "container"], &["Container", "Mutable", "Map", "MutableMap", "Set", "MutableSet"]),
-            (&["std", "iter"], &["FromIterator", "Extendable"]),
-            (&["std", "iter"], &["Iterator", "DoubleEndedIterator", "RandomAccessIterator", "CloneableIterator"]),
-            (&["std", "iter"], &["OrdIterator", "MutableDoubleEndedIterator", "ExactSize"]),
-            (&["std", "num"], &["Num", "NumCast", "CheckedAdd", "CheckedSub", "CheckedMul"]),
-            (&["std", "num"], &["Signed", "Unsigned", "Round"]),
-            (&["std", "num"], &["Primitive", "Int", "Float", "ToPrimitive", "FromPrimitive"]),
-            (&["std", "path"], &["GenericPath", "Path", "PosixPath", "WindowsPath"]),
-            (&["std", "ptr"], &["RawPtr"]),
-            (&["std", "io"], &["Buffer", "Writer", "Reader", "Seek"]),
-            (&["std", "str"], &["Str", "StrVector", "StrSlice", "OwnedStr", "IntoMaybeOwned"]),
-            (&["std", "to_str"], &["ToStr", "IntoStr"]),
-            (&["std", "tuple"], &["Tuple1", "Tuple2", "Tuple3", "Tuple4"]),
-            (&["std", "tuple"], &["Tuple5", "Tuple6", "Tuple7", "Tuple8"]),
-            (&["std", "tuple"], &["Tuple9", "Tuple10", "Tuple11", "Tuple12"]),
-            (&["std", "slice"], &["ImmutableEqVector", "ImmutableTotalOrdVector", "ImmutableCloneableVector"]),
-            (&["std", "slice"], &["OwnedVector", "OwnedCloneableVector", "OwnedEqVector"]),
-            (&["std", "slice"], &["MutableVector", "MutableTotalOrdVector"]),
-            (&["std", "slice"], &["Vector", "VectorVector", "CloneableVector", "ImmutableVector"]),
-            (&["std", "strbuf"], &["StrBuf"]),
-            (&["std", "vec"], &["Vec"]),
-
-            // Reexported runtime types
-            (&["std", "comm"], &["sync_channel", "channel", "SyncSender", "Sender", "Receiver"]),
-            (&["std", "task"], &["spawn"]),
-
-            // no GC. :p
-        ];
-
-        let preludes = preludes.iter().map(|&(base_path, idents)| {
+        let preludes = PRELUDE_LIST.iter().map(|&(base_path, idents)| {
             create_path_list(base_path, idents)
         }).collect();
 
