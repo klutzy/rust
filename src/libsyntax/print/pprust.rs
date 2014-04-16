@@ -1104,6 +1104,23 @@ impl<'a> State<'a> {
         self.pclose()
     }
 
+    pub fn print_expr_parentheses(&mut self, expr: &ast::Expr) -> IoResult<()> {
+        let needs_par = match expr.node {
+            ast::ExprLit(..) |
+            ast::ExprAssign(..) | ast::ExprBinary(..) |
+            ast::ExprAssignOp(..) | ast::ExprCast(..) => true,
+            _ => false,
+        };
+        if needs_par {
+            try!(self.popen());
+        }
+        try!(self.print_expr(expr));
+        if needs_par {
+            try!(self.pclose());
+        }
+        Ok(())
+    }
+
     pub fn print_expr(&mut self, expr: &ast::Expr) -> IoResult<()> {
         try!(self.maybe_print_comment(expr.span.lo));
         try!(self.ibox(indent_unit));
@@ -1194,24 +1211,24 @@ impl<'a> State<'a> {
                 try!(self.print_call_post(base_args));
             }
             ast::ExprBinary(op, lhs, rhs) => {
-                try!(self.print_expr(lhs));
+                try!(self.print_expr_parentheses(lhs));
                 try!(space(&mut self.s));
                 try!(self.word_space(ast_util::binop_to_str(op)));
-                try!(self.print_expr(rhs));
+                try!(self.print_expr_parentheses(rhs));
             }
             ast::ExprUnary(op, expr) => {
                 try!(word(&mut self.s, ast_util::unop_to_str(op)));
-                try!(self.print_expr(expr));
+                try!(self.print_expr_parentheses(expr));
             }
             ast::ExprAddrOf(m, expr) => {
                 try!(word(&mut self.s, "&"));
                 try!(self.print_mutability(m));
-                // Avoid `& &e` => `&&e`.
                 match (m, &expr.node) {
+                    // Avoid `& &e` => `&&e`.
                     (ast::MutImmutable, &ast::ExprAddrOf(..)) => try!(space(&mut self.s)),
                     _ => { }
                 }
-                try!(self.print_expr(expr));
+                try!(self.print_expr_parentheses(expr));
             }
             ast::ExprLit(lit) => try!(self.print_literal(lit)),
             ast::ExprCast(expr, ty) => {
