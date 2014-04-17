@@ -236,6 +236,15 @@ pub fn visibility_qualified(vis: ast::Visibility, s: &str) -> ~str {
     }
 }
 
+fn needs_parentheses(expr: &ast::Expr) -> bool {
+    match expr.node {
+        ast::ExprAssign(..) | ast::ExprBinary(..) |
+        ast::ExprFnBlock(..) | ast::ExprProc(..) |
+        ast::ExprAssignOp(..) | ast::ExprCast(..) => true,
+        _ => false,
+    }
+}
+
 impl<'a> State<'a> {
     pub fn ibox(&mut self, u: uint) -> IoResult<()> {
         self.boxes.push(pp::Inconsistent);
@@ -1105,13 +1114,7 @@ impl<'a> State<'a> {
     }
 
     pub fn print_expr_parentheses(&mut self, expr: &ast::Expr) -> IoResult<()> {
-        let needs_par = match expr.node {
-            ast::ExprLit(..) |
-            ast::ExprAssign(..) | ast::ExprBinary(..) |
-            ast::ExprFnBlock(..) | ast::ExprProc(..) |
-            ast::ExprAssignOp(..) | ast::ExprCast(..) => true,
-            _ => false,
-        };
+        let needs_par = needs_parentheses(expr);
         if needs_par {
             try!(self.popen());
         }
@@ -1223,13 +1226,33 @@ impl<'a> State<'a> {
             }
             ast::ExprAddrOf(m, expr) => {
                 try!(word(&mut self.s, "&"));
+
+                let needs_par = match expr.node {
+                    // "str" is special: & + "str" becomes &"str" which is &str, not &&str
+                    ast::ExprLit(lit) => {
+                        match lit.node {
+                            ast::LitStr(..) => true,
+                            _ => false,
+                        }
+                    }
+                    _ => false,
+                };
+                let needs_par = needs_par | needs_parentheses(expr);
+
                 try!(self.print_mutability(m));
                 match (m, &expr.node) {
                     // Avoid `& &e` => `&&e`.
                     (ast::MutImmutable, &ast::ExprAddrOf(..)) => try!(space(&mut self.s)),
                     _ => { }
                 }
-                try!(self.print_expr_parentheses(expr));
+
+                if needs_par {
+                    try!(self.popen());
+                }
+                try!(self.print_expr(expr));
+                if needs_par {
+                    try!(self.pclose());
+                }
             }
             ast::ExprLit(lit) => try!(self.print_literal(lit)),
             ast::ExprCast(expr, ty) => {
