@@ -1108,6 +1108,7 @@ impl<'a> State<'a> {
         let needs_par = match expr.node {
             ast::ExprLit(..) |
             ast::ExprAssign(..) | ast::ExprBinary(..) |
+            ast::ExprFnBlock(..) | ast::ExprProc(..) |
             ast::ExprAssignOp(..) | ast::ExprCast(..) => true,
             _ => false,
         };
@@ -1194,7 +1195,7 @@ impl<'a> State<'a> {
                 try!(self.pclose());
             }
             ast::ExprCall(func, ref args) => {
-                try!(self.print_expr(func));
+                try!(self.print_expr_parentheses(func));
                 try!(self.print_call_post(args.as_slice()));
             }
             ast::ExprMethodCall(ident, ref tys, ref args) => {
