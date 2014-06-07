@@ -69,7 +69,7 @@ mod imp {
     use os;
     use rand::Rng;
     use result::{Ok, Err};
-    use rt::stack;
+    //use rt::stack;
     use self::libc::{c_ulong, DWORD, BYTE, LPCSTR, BOOL};
     use slice::MutableVector;
 
@@ -91,7 +91,7 @@ mod imp {
     static PROV_RSA_FULL: DWORD = 1;
     static CRYPT_SILENT: DWORD = 64;
     static CRYPT_VERIFYCONTEXT: DWORD = 0xF0000000;
-    static NTE_BAD_SIGNATURE: DWORD = 0x80090006;
+    //static NTE_BAD_SIGNATURE: DWORD = 0x80090006;
 
     #[allow(non_snake_case_functions)]
     extern "system" {
@@ -110,12 +110,13 @@ mod imp {
         /// Create a new `OsRng`.
         pub fn new() -> IoResult<OsRng> {
             let mut hcp = 0;
-            let mut ret = unsafe {
+            let ret = unsafe {
                 CryptAcquireContextA(&mut hcp, 0 as LPCSTR, 0 as LPCSTR,
                                      PROV_RSA_FULL,
                                      CRYPT_VERIFYCONTEXT | CRYPT_SILENT)
             };
 
+            // TODO remove this yah
             // FIXME #13259:
             // It turns out that if we can't acquire a context with the
             // NTE_BAD_SIGNATURE error code, the documentation states:
@@ -141,16 +142,16 @@ mod imp {
             // Again, I'm not sure why this is the fix, nor why we're getting
             // this error. All I can say is that this seems to allow libnative
             // to progress where it otherwise would be hindered. Who knew?
-            if ret == 0 && os::errno() as DWORD == NTE_BAD_SIGNATURE {
-                unsafe {
-                    let limit = stack::get_sp_limit();
-                    stack::record_sp_limit(0);
-                    ret = CryptAcquireContextA(&mut hcp, 0 as LPCSTR, 0 as LPCSTR,
-                                               PROV_RSA_FULL,
-                                               CRYPT_VERIFYCONTEXT | CRYPT_SILENT);
-                    stack::record_sp_limit(limit);
-                }
-            }
+            // if ret == 0 && os::errno() as DWORD == NTE_BAD_SIGNATURE {
+            //     unsafe {
+            //         let limit = stack::get_sp_limit();
+            //         stack::record_sp_limit(0);
+            //         ret = CryptAcquireContextA(&mut hcp, 0 as LPCSTR, 0 as LPCSTR,
+            //                                    PROV_RSA_FULL,
+            //                                    CRYPT_VERIFYCONTEXT | CRYPT_SILENT);
+            //         stack::record_sp_limit(limit);
+            //     }
+            // }
 
             if ret == 0 {
                 Err(IoError::last_error())

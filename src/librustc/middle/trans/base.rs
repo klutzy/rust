@@ -417,15 +417,23 @@ pub fn set_always_inline(f: ValueRef) {
 }
 
 pub fn set_split_stack(f: ValueRef) {
-    "split-stack".with_c_str(|buf| {
-        unsafe { llvm::LLVMAddFunctionAttrString(f, lib::llvm::FunctionIndex as c_uint, buf); }
-    })
+    if !cfg!(windows) {
+        "split-stack".with_c_str(|buf| {
+            unsafe {
+                llvm::LLVMAddFunctionAttrString(f, lib::llvm::FunctionIndex as c_uint, buf);
+            }
+        })
+    }
 }
 
 pub fn unset_split_stack(f: ValueRef) {
-    "split-stack".with_c_str(|buf| {
-        unsafe { llvm::LLVMRemoveFunctionAttrString(f, lib::llvm::FunctionIndex as c_uint, buf); }
-    })
+    if !cfg!(windows) {
+        "split-stack".with_c_str(|buf| {
+            unsafe {
+                llvm::LLVMRemoveFunctionAttrString(f, lib::llvm::FunctionIndex as c_uint, buf);
+            }
+        })
+    }
 }
 
 // Double-check that we never ask LLVM to declare the same symbol twice. It
