@@ -98,10 +98,11 @@ extern {}
 extern "C" {
     // iOS on armv7 uses SjLj exceptions and requires to link
     // against corresponding routine (..._SjLj_...)
-    #[cfg(not(target_os = "ios", target_arch = "arm"))]
+    #[cfg(not(target_os = "ios", target_arch = "arm"), not(sjlj))]
     pub fn _Unwind_RaiseException(exception: *mut _Unwind_Exception)
                                   -> _Unwind_Reason_Code;
 
+    #[cfg(sjlj)]
     #[cfg(target_os = "ios", target_arch = "arm")]
     fn _Unwind_SjLj_RaiseException(e: *mut _Unwind_Exception)
                                    -> _Unwind_Reason_Code;
@@ -112,6 +113,7 @@ extern "C" {
 // ... and now we just providing access to SjLj counterspart
 // through a standard name to hide those details from others
 // (see also comment above regarding _Unwind_RaiseException)
+#[cfg(sjlj)]
 #[cfg(target_os = "ios", target_arch = "arm")]
 #[inline(always)]
 pub unsafe fn _Unwind_RaiseException(exc: *mut _Unwind_Exception)

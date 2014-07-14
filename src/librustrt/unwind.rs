@@ -224,7 +224,7 @@ fn rust_exception_class() -> uw::_Unwind_Exception_Class {
 //   This is achieved by overriding the return value in search phase to always
 //   say "catch!".
 
-#[cfg(not(target_arch = "arm"), not(test))]
+#[cfg(not(target_arch = "arm"), not(test), not(sjlj))]
 #[doc(hidden)]
 #[allow(visible_private_types)]
 pub mod eabi {
@@ -279,6 +279,7 @@ pub mod eabi {
 // iOS on armv7 is using SjLj exceptions and therefore requires to use
 // a specialized personality routine: __gcc_personality_sj0
 
+#[cfg(sjlj)]
 #[cfg(target_os = "ios", target_arch = "arm", not(test))]
 #[doc(hidden)]
 #[allow(visible_private_types)]
@@ -520,4 +521,12 @@ pub unsafe fn register(f: Callback) -> bool {
             false
         }
     }
+}
+
+// dummy functions for #12859
+#[cfg(sjlj)]
+#[no_mangle]
+#[allow(non_snake_case_functions)]
+pub extern "C" fn _Unwind_Resume(_ex_obj: *mut ()) {
+    // _ex_obj is actually *mut uw::_Unwind_Exception, but it is private
 }

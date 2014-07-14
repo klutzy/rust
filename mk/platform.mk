@@ -521,7 +521,7 @@ CFG_PATH_MUNGE_i686-w64-mingw32 :=
 CFG_LDPATH_i686-w64-mingw32 :=$(CFG_LDPATH_i686-w64-mingw32):$(PATH)
 CFG_RUN_i686-w64-mingw32=PATH="$(CFG_LDPATH_i686-w64-mingw32):$(1)" $(2)
 CFG_RUN_TARG_i686-w64-mingw32=$(call CFG_RUN_i686-w64-mingw32,$(HLIB$(1)_H_$(CFG_BUILD)),$(2))
-RUSTC_CROSS_FLAGS_i686-w64-mingw32 :=
+RUSTC_CROSS_FLAGS_i686-w64-mingw32 :=--cfg sjlj
 
 # x86_64-w64-mingw32 configuration
 CROSS_PREFIX_x86_64-w64-mingw32=x86_64-w64-mingw32-
