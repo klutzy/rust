@@ -587,7 +587,6 @@ pub enum CaptureClause {
 /// else knows what to do with them, so you'll probably get a syntax
 /// error.
 #[deriving(Clone, PartialEq, Eq, Encodable, Decodable, Hash, Show)]
-#[doc="For macro invocations; parsing is delegated to the macro"]
 pub enum TokenTree {
     /// A single token
     TTTok(Span, ::parse::token::Token),

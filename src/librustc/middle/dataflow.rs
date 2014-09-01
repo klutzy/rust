@@ -462,8 +462,8 @@ impl<'a, 'tcx, O:DataFlowOperator+Clone+'static> DataFlowContext<'a, 'tcx, O> {
     fn pretty_print_to(&self, wr: Box<io::Writer+'static>,
                        blk: &ast::Block) -> io::IoResult<()> {
         let mut ps = pprust::rust_printer_annotated(wr, self);
-        try!(ps.cbox(pprust::indent_unit));
-        try!(ps.ibox(0u));
+        try!(ps.cbox_indent());
+        try!(ps.ibox());
         try!(ps.print_block(blk));
         pp::eof(&mut ps.s)
     }
