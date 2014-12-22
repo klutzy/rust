@@ -439,13 +439,6 @@ pub mod with_hygiene {
     thing_to_string_impls! { to_string_hyg }
 }
 
-pub fn visibility_qualified(vis: ast::Visibility, s: &str) -> String {
-    match vis {
-        ast::Public => format!("pub {}", s),
-        ast::Inherited => s.to_string()
-    }
-}
-
 fn needs_parentheses(expr: &ast::Expr) -> bool {
     match expr.node {
         ast::ExprAssign(..) | ast::ExprBinary(..) |
@@ -580,15 +573,13 @@ impl<'a> State<'a> {
         self.token(Token::CloseDelim(DelimToken::Paren))
     }
 
-    pub fn head(&mut self, w: &str) -> IoResult<()> {
+    pub fn head<F>(&mut self, w: F) -> IoResult<()> where F: FnOnce(&mut State) -> IoResult<()> {
         // outer-box is consistent
         try!(self.cbox(indent_unit));
         // head-box is inconsistent
-        try!(self.ibox(w.len() + 1));
         // keyword that starts the head
-        if !w.is_empty() {
-            try!(self.word_nbsp(w));
-        }
+        try!(w(self));
+        try!(self.ibox(0));
         Ok(())
     }
 
@@ -870,8 +861,10 @@ impl<'a> State<'a> {
                 self.end() // end the outer fn box
             }
             ast::ForeignItemStatic(ref t, m) => {
-                try!(self.head(visibility_qualified(item.vis,
-                                                    "static").as_slice()));
+                try!(self.head(|s| {
+                    try!(s.print_visibility(item.vis));
+                    s.keyword_nbsp(Keyword::Static)
+                }));
                 if m {
                     try!(self.keyword_sp(Keyword::Mut));
                 }
@@ -916,8 +909,10 @@ impl<'a> State<'a> {
         try!(self.ann.pre(self, NodeItem(item)));
         match item.node {
             ast::ItemStatic(ref ty, m, ref expr) => {
-                try!(self.head(visibility_qualified(item.vis,
-                                                    "static").as_slice()));
+                try!(self.head(|s| {
+                    try!(s.print_visibility(item.vis));
+                    s.keyword_nbsp(Keyword::Static)
+                }));
                 if m == ast::MutMutable {
                     try!(self.keyword_sp(Keyword::Mut));
                 }
@@ -933,8 +928,10 @@ impl<'a> State<'a> {
                 try!(self.end()); // end the outer cbox
             }
             ast::ItemConst(ref ty, ref expr) => {
-                try!(self.head(visibility_qualified(item.vis,
-                                                    "const").as_slice()));
+                try!(self.head(|s| {
+                    try!(s.print_visibility(item.vis));
+                    s.keyword_nbsp(Keyword::Const)
+                }));
                 try!(self.print_ident(item.ident));
                 try!(self.token_sp(Token::Colon));
                 try!(self.print_type(&**ty));
@@ -960,8 +957,10 @@ impl<'a> State<'a> {
                 try!(self.print_block_with_attrs(&**body, item.attrs.as_slice()));
             }
             ast::ItemMod(ref _mod) => {
-                try!(self.head(visibility_qualified(item.vis,
-                                                    "mod").as_slice()));
+                try!(self.head(|s| {
+                    try!(s.print_visibility(item.vis));
+                    s.keyword_nbsp(Keyword::Mod)
+                }));
                 try!(self.print_ident(item.ident));
                 try!(self.nbsp());
                 try!(self.bopen());
@@ -969,7 +968,9 @@ impl<'a> State<'a> {
                 try!(self.bclose(item.span));
             }
             ast::ItemForeignMod(ref nmod) => {
-                try!(self.head("extern"));
+                try!(self.head(|s| {
+                    s.keyword_nbsp(Keyword::Extern)
+                }));
                 try!(self.print_abi(nmod.abi));
                 try!(self.bopen());
                 try!(self.print_foreign_mod(nmod, item.attrs.as_slice()));
@@ -978,8 +979,8 @@ impl<'a> State<'a> {
             ast::ItemTy(ref ty, ref params) => {
                 try!(self.ibox(indent_unit));
                 try!(self.ibox(0u));
-                try!(self.word_nbsp(visibility_qualified(item.vis,
-                                                         "type").as_slice()));
+                try!(self.print_visibility(item.vis));
+                try!(self.keyword_nbsp(Keyword::Type));
                 try!(self.print_ident(item.ident));
                 try!(self.print_generics(params));
                 try!(self.end()); // end the inner ibox
@@ -1001,7 +1002,10 @@ impl<'a> State<'a> {
                 ));
             }
             ast::ItemStruct(ref struct_def, ref generics) => {
-                try!(self.head(visibility_qualified(item.vis,"struct").as_slice()));
+                try!(self.head(|s| {
+                    try!(s.print_visibility(item.vis));
+                    s.keyword_nbsp(Keyword::Struct)
+                }));
                 try!(self.print_struct(&**struct_def, generics, item.ident, item.span));
             }
 
@@ -1010,7 +1014,7 @@ impl<'a> State<'a> {
                           ref opt_trait,
                           ref ty,
                           ref impl_items) => {
-                try!(self.head(""));
+                try!(self.head(|_| Ok(())));
                 try!(self.print_visibility(item.vis));
                 try!(self.print_unsafety(unsafety));
                 try!(self.keyword_nbsp(Keyword::Impl));
@@ -1048,7 +1052,7 @@ impl<'a> State<'a> {
                 try!(self.bclose(item.span));
             }
             ast::ItemTrait(unsafety, ref generics, ref unbound, ref bounds, ref methods) => {
-                try!(self.head(""));
+                try!(self.head(|_| Ok(())));
                 try!(self.print_visibility(item.vis));
                 try!(self.print_unsafety(unsafety));
                 try!(self.keyword_nbsp(Keyword::Trait));
@@ -1114,7 +1118,10 @@ impl<'a> State<'a> {
                           generics: &ast::Generics, ident: ast::Ident,
                           span: codemap::Span,
                           visibility: ast::Visibility) -> IoResult<()> {
-        try!(self.head(visibility_qualified(visibility, "enum").as_slice()));
+        try!(self.head(|s| {
+            try!(s.print_visibility(visibility));
+            s.keyword_nbsp(Keyword::Enum)
+        }));
         try!(self.print_ident(ident));
         try!(self.print_generics(generics));
         try!(self.print_where_clause(generics));
@@ -1271,7 +1278,7 @@ impl<'a> State<'a> {
                 }
             }
             ast::StructVariantKind(ref struct_def) => {
-                try!(self.head(""));
+                try!(self.head(|_| Ok(())));
                 let generics = ast_util::empty_generics();
                 try!(self.print_struct(&**struct_def, &generics, v.node.name, v.span));
             }
@@ -1555,7 +1562,9 @@ impl<'a> State<'a> {
 
     pub fn print_if(&mut self, test: &ast::Expr, blk: &ast::Block,
                     elseopt: Option<&ast::Expr>) -> IoResult<()> {
-        try!(self.head("if"));
+        try!(self.head(|s| {
+            s.keyword_nbsp(Keyword::If)
+        }));
         try!(self.print_expr(test));
         try!(self.space());
         try!(self.print_block(blk));
@@ -1564,7 +1573,10 @@ impl<'a> State<'a> {
 
     pub fn print_if_let(&mut self, pat: &ast::Pat, expr: &ast::Expr, blk: &ast::Block,
                         elseopt: Option<&ast::Expr>) -> IoResult<()> {
-        try!(self.head("if let"));
+        try!(self.head(|s| {
+            try!(s.keyword_nbsp(Keyword::If));
+            s.keyword_nbsp(Keyword::Let)
+        }));
         try!(self.print_pat(pat));
         try!(self.space());
         try!(self.token_sp(Token::Eq));
@@ -1735,7 +1747,9 @@ impl<'a> State<'a> {
                     try!(self.print_ident(*ident));
                     try!(self.token_sp(Token::Colon));
                 }
-                try!(self.head("while"));
+                try!(self.head(|s| {
+                    s.keyword_nbsp(Keyword::While)
+                }));
                 try!(self.print_expr(&**test));
                 try!(self.space());
                 try!(self.print_block(&**blk));
@@ -1745,7 +1759,10 @@ impl<'a> State<'a> {
                     try!(self.print_ident(*ident));
                     try!(self.token_sp(Token::Colon));
                 }
-                try!(self.head("while let"));
+                try!(self.head(|s| {
+                    try!(s.keyword_nbsp(Keyword::While));
+                    s.keyword_nbsp(Keyword::Let)
+                }));
                 try!(self.print_pat(&**pat));
                 try!(self.space());
                 try!(self.token_sp(Token::Eq));
@@ -1758,7 +1775,9 @@ impl<'a> State<'a> {
                     try!(self.print_ident(*ident));
                     try!(self.token_sp(Token::Colon));
                 }
-                try!(self.head("for"));
+                try!(self.head(|s| {
+                    s.keyword_nbsp(Keyword::For)
+                }));
                 try!(self.print_pat(&**pat));
                 try!(self.space());
                 try!(self.keyword_sp(Keyword::In));
@@ -1771,7 +1790,9 @@ impl<'a> State<'a> {
                     try!(self.print_ident(*ident));
                     try!(self.token_sp(Token::Colon));
                 }
-                try!(self.head("loop"));
+                try!(self.head(|s| {
+                    s.keyword_nbsp(Keyword::Loop)
+                }));
                 try!(self.space());
                 try!(self.print_block(&**blk));
             }
@@ -2330,7 +2351,7 @@ impl<'a> State<'a> {
                     generics: &ast::Generics,
                     opt_explicit_self: Option<&ast::ExplicitSelf_>,
                     vis: ast::Visibility) -> IoResult<()> {
-        try!(self.head(""));
+        try!(self.head(|_| Ok(())));
         try!(self.print_fn_header_info(opt_explicit_self, unsafety, abi, vis));
         try!(self.nbsp());
         try!(self.print_ident(name));
@@ -2695,7 +2716,10 @@ impl<'a> State<'a> {
         try!(self.print_visibility(item.vis));
         match item.node {
             ast::ViewItemExternCrate(id, ref optional_path, _) => {
-                try!(self.head("extern crate"));
+                try!(self.head(|s| {
+                    try!(s.keyword_nbsp(Keyword::Extern));
+                    s.keyword_nbsp(Keyword::Crate)
+                }));
                 for &(ref p, style) in optional_path.iter() {
                     try!(self.print_string(p.get(), style));
                     try!(self.space());
@@ -2706,7 +2730,9 @@ impl<'a> State<'a> {
             }
 
             ast::ViewItemUse(ref vp) => {
-                try!(self.head("use"));
+                try!(self.head(|s| {
+                    s.keyword_nbsp(Keyword::Use)
+                }));
                 try!(self.print_view_path(&**vp));
             }
         }
@@ -3104,7 +3130,7 @@ impl<'a> State<'a> {
                                 opt_unsafety: Option<ast::Unsafety>,
                                 abi: abi::Abi,
                                 vis: ast::Visibility) -> IoResult<()> {
-        try!(word(&mut self.s, visibility_qualified(vis, "").as_slice()));
+        try!(self.print_visibility(vis));
         try!(self.print_opt_unsafety(opt_unsafety));
 
         if abi != abi::Rust {
