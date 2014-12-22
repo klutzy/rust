@@ -31,6 +31,7 @@ use rustc_borrowck::graphviz as borrowck_dot;
 use syntax::ast;
 use syntax::ast_map::{mod, blocks, NodePrinter};
 use syntax::print::{pp, pprust};
+use syntax::print::pprust::{PpWriter, AstWriter};
 
 use graphviz as dot;
 
@@ -477,7 +478,7 @@ pub fn pretty_print_input(sess: Session,
                     let sess = annotation.sess();
                     let ast_map = annotation.ast_map()
                         .expect("--pretty missing ast_map");
-                    let mut pp_state =
+                    let mut pp =
                         pprust::State::new_from_input(sess.codemap(),
                                                       sess.diagnostic(),
                                                       src_name.to_string(),
@@ -487,12 +488,12 @@ pub fn pretty_print_input(sess: Session,
                                                       is_expanded);
                     for node_id in uii.all_matching_node_ids(ast_map) {
                         let node = ast_map.get(node_id);
-                        try!(pp_state.print_node(&node));
-                        try!(pp::space(&mut pp_state.s));
-                        try!(pp_state.synth_comment(ast_map.path_to_string(node_id)));
-                        try!(pp::hardbreak(&mut pp_state.s));
+                        try!(pp.print_node(&node));
+                        try!(pp.space());
+                        try!(pp.synth_comment(ast_map.path_to_string(node_id)));
+                        try!(pp.hardbreak());
                     }
-                    pp::eof(&mut pp_state.s)
+                    pp.eof()
                 }),
 
         (PpmFlowGraph, opt_uii) => {

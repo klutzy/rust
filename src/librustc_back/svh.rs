@@ -137,7 +137,7 @@ mod svh_visitor {
     use syntax::ast::*;
     use syntax::codemap::Span;
     use syntax::parse::token;
-    use syntax::print::pprust;
+    use syntax::print::pprust::{mod, AstWriter};
     use syntax::visit;
     use syntax::visit::{Visitor, FnKind};
 

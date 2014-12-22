@@ -18,7 +18,7 @@ use ast_util;
 use codemap::{DUMMY_SP, Span, Spanned};
 use fold::Folder;
 use parse::token;
-use print::pprust;
+use print::pprust::{mod, AstWriter};
 use ptr::P;
 use visit::{mod, Visitor};
 

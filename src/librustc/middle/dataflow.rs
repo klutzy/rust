@@ -25,6 +25,7 @@ use syntax::ast;
 use syntax::ast_util::IdRange;
 use syntax::visit;
 use syntax::print::{pp, pprust};
+use syntax::print::pprust::{PpWriter, AstWriter};
 use util::nodemap::NodeMap;
 
 #[deriving(Copy, Show)]
@@ -136,7 +137,7 @@ impl<'a, 'tcx, O:DataFlowOperator> pprust::PpAnn for DataFlowContext<'a, 'tcx, O
 
             try!(ps.synth_comment(format!("id {}: {}{}{}", id, entry_str,
                                           gens_str, kills_str)));
-            try!(pp::space(&mut ps.s));
+            try!(ps.space());
         }
         Ok(())
     }
@@ -467,7 +468,7 @@ impl<'a, 'tcx, O:DataFlowOperator+Clone+'static> DataFlowContext<'a, 'tcx, O> {
         try!(ps.cbox(pprust::indent_unit));
         try!(ps.ibox(0u));
         try!(ps.print_block(blk));
-        pp::eof(&mut ps.s)
+        ps.eof()
     }
 }
 

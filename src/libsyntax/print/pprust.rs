@@ -57,17 +57,6 @@ pub struct CurrentCommentAndLiteral {
     cur_lit: uint,
 }
 
-pub struct State<'a> {
-    pub s: pp::Printer,
-    cm: Option<&'a CodeMap>,
-    comments: Option<Vec<comments::Comment> >,
-    literals: Option<Vec<comments::Literal> >,
-    cur_cmnt_and_lit: CurrentCommentAndLiteral,
-    boxes: Vec<pp::Breaks>,
-    ann: &'a (PpAnn+'a),
-    encode_idents_with_hygiene: bool,
-}
-
 pub fn rust_printer(writer: Box<io::Writer+'static>) -> State<'static> {
     static NO_ANN: NoAnn = NoAnn;
     rust_printer_annotated(writer, &NO_ANN)
@@ -116,7 +105,7 @@ pub fn print_crate<'a>(cm: &'a CodeMap,
                                       is_expanded);
     try!(s.print_mod(&krate.module, krate.attrs.as_slice()));
     try!(s.print_remaining_comments());
-    eof(&mut s.s)
+    s.eof()
 }
 
 impl<'a> State<'a> {
@@ -170,7 +159,7 @@ pub fn to_string<F>(f: F) -> String where
     use std::raw::TraitObject;
     let mut s = rust_printer(box Vec::new());
     f(&mut s).unwrap();
-    eof(&mut s.s).unwrap();
+    s.eof().unwrap();
     let wr = unsafe {
         // FIXME(pcwalton): A nasty function to extract the string from an `io::Writer`
         // that we "know" to be a `Vec<u8>` that works around the lack of checked
@@ -424,6 +413,7 @@ pub mod with_hygiene {
     use ast;
     use std::io::IoResult;
     use super::indent_unit;
+    use super::{PpWriter, AstWriter};
 
     // This function is the trick that all the rest of the routines
     // hang on.
@@ -448,40 +438,57 @@ fn needs_parentheses(expr: &ast::Expr) -> bool {
     }
 }
 
-impl<'a> State<'a> {
-    pub fn token(&mut self, t: Token) -> IoResult<()> {
-        // token_to_string is not hygiene-aware
-        if let Token::Ident(ident, _) = t {
-            if self.encode_idents_with_hygiene {
-                let encoded = ident.encode_with_hygiene();
-                pp::word(&mut self.s, encoded.as_slice())
-            } else {
-                pp::word(&mut self.s, token::get_ident(ident).get())
-            }
-        } else {
-            let s = token_to_string(&t);
-            pp::word(&mut self.s, &*s)
-        }
+// accepts token or pp context information.
+pub trait PpWriter {
+    fn token(&mut self, t: Token) -> IoResult<()>;
+
+    fn rbox(&mut self, u: uint, b: pp::Breaks) -> IoResult<()> { Ok(()) }
+    fn end(&mut self) -> IoResult<()> { Ok(()) }
+    fn space(&mut self) -> IoResult<()> { Ok(()) }
+    fn nbsp(&mut self) -> IoResult<()> { Ok(()) }
+    fn hardbreak_if_not_bol(&mut self) -> IoResult<()> { Ok(()) }
+    fn space_if_not_bol(&mut self) -> IoResult<()> { Ok(()) }
+    fn break_offset_if_not_bol(&mut self, n: uint, off: int) -> IoResult<()> { Ok(()) }
+    fn synth_comment(&mut self, text: String) -> IoResult<()> { Ok(()) }
+    fn hardbreak(&mut self) -> IoResult<()> { Ok(()) }
+    fn zerobreak(&mut self) -> IoResult<()> { Ok(()) }
+    fn doccomment(&mut self, d: &str) -> IoResult<()> { Ok(()) }
+    fn maybe_print_trailing_comment(&mut self,
+                                    span: codemap::Span,
+                                    next_pos: Option<BytePos>) -> IoResult<()> { Ok(()) }
+    fn maybe_print_comment(&mut self, pos: BytePos) -> IoResult<()> { Ok(()) }
+    fn print_remaining_comments(&mut self) -> IoResult<()> { Ok(()) }
+    fn print_next_lit(&mut self, pos: BytePos) -> IoResult<bool> { Ok(false) }
+    fn ann_pre(&mut self, node: AnnNode) -> IoResult<()> { Ok(()) }
+    fn ann_post(&mut self, node: AnnNode) -> IoResult<()> { Ok(()) }
+    fn eof(&mut self) -> IoResult<()> { Ok(()) }
+
+    fn ibox(&mut self, u: uint) -> IoResult<()> {
+        self.rbox(u, pp::Inconsistent)
+    }
+
+    fn cbox(&mut self, u: uint) -> IoResult<()> {
+        self.rbox(u, pp::Consistent)
     }
 }
 
-impl<'a> State<'a> {
-    pub fn ident_from_str(&mut self, s: &str) -> IoResult<()> {
+pub trait AstWriter: PpWriter {
+    fn ident_from_str(&mut self, s: &str) -> IoResult<()> {
         let id = token::str_to_ident(s);
         self.print_ident(id)
     }
 
-    pub fn token_nbsp(&mut self, t: Token) -> IoResult<()> {
+    fn token_nbsp(&mut self, t: Token) -> IoResult<()> {
         try!(self.token(t));
         self.nbsp()
     }
 
-    pub fn token_sp(&mut self, t: Token) -> IoResult<()> {
+    fn token_sp(&mut self, t: Token) -> IoResult<()> {
         try!(self.token(t));
         self.space()
     }
 
-    pub fn binop(&mut self, b: ast::BinOp) -> IoResult<()> {
+    fn binop(&mut self, b: ast::BinOp) -> IoResult<()> {
         let token = match b {
             ast::BiMul    => Token::BinOp(BinOpToken::Star),
             ast::BiDiv    => Token::BinOp(BinOpToken::Slash),
@@ -505,7 +512,7 @@ impl<'a> State<'a> {
         self.token(token)
     }
 
-    pub fn unop(&mut self, u: ast::UnOp) -> IoResult<()> {
+    fn unop(&mut self, u: ast::UnOp) -> IoResult<()> {
         match u {
             ast::UnUniq => {
                 try!(self.keyword(Keyword::Box));
@@ -520,60 +527,38 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn binop_tok(&mut self, b: BinOpToken) -> IoResult<()> {
+    fn binop_tok(&mut self, b: BinOpToken) -> IoResult<()> {
         self.token(Token::BinOp(b))
     }
 
-    pub fn keyword(&mut self, keyword: Keyword) -> IoResult<()> {
+    fn keyword(&mut self, keyword: Keyword) -> IoResult<()> {
         let ident = keyword.to_name().ident();
         let token = Token::Ident(ident, token::IdentStyle::Plain);
         self.token(token)
     }
 
-    pub fn keyword_nbsp(&mut self, keyword: Keyword) -> IoResult<()> {
+    fn keyword_nbsp(&mut self, keyword: Keyword) -> IoResult<()> {
         try!(self.keyword(keyword));
         self.nbsp()
     }
 
-    pub fn keyword_sp(&mut self, keyword: Keyword) -> IoResult<()> {
+    fn keyword_sp(&mut self, keyword: Keyword) -> IoResult<()> {
         try!(self.keyword(keyword));
         self.space()
     }
 
-    pub fn ibox(&mut self, u: uint) -> IoResult<()> {
-        self.boxes.push(pp::Inconsistent);
-        pp::ibox(&mut self.s, u)
-    }
 
-    pub fn end(&mut self) -> IoResult<()> {
-        self.boxes.pop().unwrap();
-        pp::end(&mut self.s)
-    }
-
-    pub fn cbox(&mut self, u: uint) -> IoResult<()> {
-        self.boxes.push(pp::Consistent);
-        pp::cbox(&mut self.s, u)
-    }
-
-    // "raw box"
-    pub fn rbox(&mut self, u: uint, b: pp::Breaks) -> IoResult<()> {
-        self.boxes.push(b);
-        pp::rbox(&mut self.s, u, b)
-    }
-
-    pub fn space(&mut self) -> IoResult<()> { space(&mut self.s) }
-
-    pub fn nbsp(&mut self) -> IoResult<()> { word(&mut self.s, " ") }
-
-    pub fn popen(&mut self) -> IoResult<()> {
+    fn popen(&mut self) -> IoResult<()> {
         self.token(Token::OpenDelim(DelimToken::Paren))
     }
 
-    pub fn pclose(&mut self) -> IoResult<()> {
+    fn pclose(&mut self) -> IoResult<()> {
         self.token(Token::CloseDelim(DelimToken::Paren))
     }
 
-    pub fn head<F>(&mut self, w: F) -> IoResult<()> where F: FnOnce(&mut State) -> IoResult<()> {
+    fn head<F>(&mut self, w: F) -> IoResult<()> where
+        F: FnOnce(&mut Self) -> IoResult<()>
+    {
         // outer-box is consistent
         try!(self.cbox(indent_unit));
         // head-box is inconsistent
@@ -583,12 +568,12 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn bopen(&mut self) -> IoResult<()> {
+    fn bopen(&mut self) -> IoResult<()> {
         try!(self.token(Token::OpenDelim(DelimToken::Brace)));
         self.end() // close the head-box
     }
 
-    pub fn bclose_maybe_open (&mut self, span: codemap::Span,
+    fn bclose_maybe_open (&mut self, span: codemap::Span,
                               indented: uint, close_box: bool) -> IoResult<()> {
         try!(self.maybe_print_comment(span.hi));
         try!(self.break_offset_if_not_bol(1u, -(indented as int)));
@@ -598,67 +583,12 @@ impl<'a> State<'a> {
         }
         Ok(())
     }
-    pub fn bclose(&mut self, span: codemap::Span) -> IoResult<()> {
+    fn bclose(&mut self, span: codemap::Span) -> IoResult<()> {
         self.bclose_maybe_open(span, indent_unit, true)
     }
 
-    pub fn is_begin(&mut self) -> bool {
-        match self.s.last_token() { pp::Begin(_) => true, _ => false }
-    }
-
-    pub fn is_end(&mut self) -> bool {
-        match self.s.last_token() { pp::End => true, _ => false }
-    }
-
-    // is this the beginning of a line?
-    pub fn is_bol(&mut self) -> bool {
-        self.s.last_token().is_eof() || self.s.last_token().is_hardbreak_tok()
-    }
-
-    pub fn in_cbox(&self) -> bool {
-        match self.boxes.last() {
-            Some(&last_box) => last_box == pp::Consistent,
-            None => false
-        }
-    }
-
-    pub fn hardbreak_if_not_bol(&mut self) -> IoResult<()> {
-        if !self.is_bol() {
-            try!(hardbreak(&mut self.s))
-        }
-        Ok(())
-    }
-    pub fn space_if_not_bol(&mut self) -> IoResult<()> {
-        if !self.is_bol() { try!(self.space()); }
-        Ok(())
-    }
-    pub fn break_offset_if_not_bol(&mut self, n: uint,
-                                   off: int) -> IoResult<()> {
-        if !self.is_bol() {
-            break_offset(&mut self.s, n, off)
-        } else {
-            if off != 0 && self.s.last_token().is_hardbreak_tok() {
-                // We do something pretty sketchy here: tuck the nonzero
-                // offset-adjustment we were going to deposit along with the
-                // break into the previous hardbreak.
-                self.s.replace_last_token(pp::hardbreak_tok_offset(off));
-            }
-            Ok(())
-        }
-    }
-
-    // Synthesizes a comment that was not textually present in the original source
-    // file.
-    pub fn synth_comment(&mut self, text: String) -> IoResult<()> {
-        try!(word(&mut self.s, "/*"));
-        try!(self.space());
-        try!(word(&mut self.s, text.as_slice()));
-        try!(self.space());
-        word(&mut self.s, "*/")
-    }
-
-    pub fn commasep<T, F>(&mut self, b: Breaks, elts: &[T], mut op: F) -> IoResult<()> where
-        F: FnMut(&mut State, &T) -> IoResult<()>,
+    fn commasep<T, F>(&mut self, b: Breaks, elts: &[T], mut op: F) -> IoResult<()> where
+        F: FnMut(&mut Self, &T) -> IoResult<()>
     {
         try!(self.rbox(0u, b));
         let mut first = true;
@@ -670,12 +600,12 @@ impl<'a> State<'a> {
     }
 
 
-    pub fn commasep_cmnt<T, F, G>(&mut self,
+    fn commasep_cmnt<T, F, G>(&mut self,
                                   b: Breaks,
                                   elts: &[T],
                                   mut op: F,
                                   mut get_span: G) -> IoResult<()> where
-        F: FnMut(&mut State, &T) -> IoResult<()>,
+        F: FnMut(&mut Self, &T) -> IoResult<()>,
         G: FnMut(&T) -> codemap::Span,
     {
         try!(self.rbox(0u, b));
@@ -695,12 +625,12 @@ impl<'a> State<'a> {
         self.end()
     }
 
-    pub fn commasep_exprs(&mut self, b: Breaks,
+    fn commasep_exprs(&mut self, b: Breaks,
                           exprs: &[P<ast::Expr>]) -> IoResult<()> {
         self.commasep_cmnt(b, exprs, |s, e| s.print_expr(&**e), |e| e.span)
     }
 
-    pub fn print_mod(&mut self, _mod: &ast::Mod,
+    fn print_mod(&mut self, _mod: &ast::Mod,
                      attrs: &[ast::Attribute]) -> IoResult<()> {
         try!(self.print_inner_attributes(attrs));
         for vitem in _mod.view_items.iter() {
@@ -712,7 +642,7 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_foreign_mod(&mut self, nmod: &ast::ForeignMod,
+    fn print_foreign_mod(&mut self, nmod: &ast::ForeignMod,
                              attrs: &[ast::Attribute]) -> IoResult<()> {
         try!(self.print_inner_attributes(attrs));
         for vitem in nmod.view_items.iter() {
@@ -724,7 +654,7 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_opt_lifetime(&mut self,
+    fn print_opt_lifetime(&mut self,
                               lifetime: &Option<ast::Lifetime>) -> IoResult<()> {
         for l in lifetime.iter() {
             try!(self.print_lifetime(l));
@@ -733,7 +663,7 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_type(&mut self, ty: &ast::Ty) -> IoResult<()> {
+    fn print_type(&mut self, ty: &ast::Ty) -> IoResult<()> {
         try!(self.maybe_print_comment(ty.span.lo));
         try!(self.ibox(0u));
         match ty.node {
@@ -847,7 +777,7 @@ impl<'a> State<'a> {
         self.end()
     }
 
-    pub fn print_foreign_item(&mut self,
+    fn print_foreign_item(&mut self,
                               item: &ast::ForeignItem) -> IoResult<()> {
         try!(self.hardbreak_if_not_bol());
         try!(self.maybe_print_comment(item.span.lo));
@@ -902,11 +832,11 @@ impl<'a> State<'a> {
     }
 
     /// Pretty-print an item
-    pub fn print_item(&mut self, item: &ast::Item) -> IoResult<()> {
+    fn print_item(&mut self, item: &ast::Item) -> IoResult<()> {
         try!(self.hardbreak_if_not_bol());
         try!(self.maybe_print_comment(item.span.lo));
         try!(self.print_outer_attributes(item.attrs.as_slice()));
-        try!(self.ann.pre(self, NodeItem(item)));
+        try!(self.ann_pre(NodeItem(item)));
         match item.node {
             ast::ItemStatic(ref ty, m, ref expr) => {
                 try!(self.head(|s| {
@@ -1089,7 +1019,7 @@ impl<'a> State<'a> {
                 try!(self.end());
             }
         }
-        self.ann.post(self, NodeItem(item))
+        self.ann_post(NodeItem(item))
     }
 
     fn print_trait_ref(&mut self, t: &ast::TraitRef) -> IoResult<()> {
@@ -1114,7 +1044,7 @@ impl<'a> State<'a> {
         self.print_trait_ref(&t.trait_ref)
     }
 
-    pub fn print_enum_def(&mut self, enum_definition: &ast::EnumDef,
+    fn print_enum_def(&mut self, enum_definition: &ast::EnumDef,
                           generics: &ast::Generics, ident: ast::Ident,
                           span: codemap::Span,
                           visibility: ast::Visibility) -> IoResult<()> {
@@ -1129,7 +1059,7 @@ impl<'a> State<'a> {
         self.print_variants(enum_definition.variants.as_slice(), span)
     }
 
-    pub fn print_variants(&mut self,
+    fn print_variants(&mut self,
                           variants: &[P<ast::Variant>],
                           span: codemap::Span) -> IoResult<()> {
         try!(self.bopen());
@@ -1146,14 +1076,14 @@ impl<'a> State<'a> {
         self.bclose(span)
     }
 
-    pub fn print_visibility(&mut self, vis: ast::Visibility) -> IoResult<()> {
+    fn print_visibility(&mut self, vis: ast::Visibility) -> IoResult<()> {
         match vis {
             ast::Public => self.keyword_nbsp(Keyword::Pub),
             ast::Inherited => Ok(())
         }
     }
 
-    pub fn print_struct(&mut self,
+    fn print_struct(&mut self,
                         struct_def: &ast::StructDef,
                         generics: &ast::Generics,
                         ident: ast::Ident,
@@ -1214,13 +1144,13 @@ impl<'a> State<'a> {
     /// appropriate macro, transcribe back into the grammar we just parsed from,
     /// and then pretty-print the resulting AST nodes (so, e.g., we print
     /// expression arguments as expressions). It can be done! I think.
-    pub fn print_tt(&mut self, tt: &ast::TokenTree) -> IoResult<()> {
+    fn print_tt(&mut self, tt: &ast::TokenTree) -> IoResult<()> {
         match *tt {
             ast::TtToken(_, ref tk) => {
                 try!(self.token(tk.clone()));
                 match *tk {
                     parse::token::DocComment(..) => {
-                        hardbreak(&mut self.s)
+                        self.hardbreak()
                     }
                     _ => Ok(())
                 }
@@ -1253,7 +1183,7 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_tts(&mut self, tts: &[ast::TokenTree]) -> IoResult<()> {
+    fn print_tts(&mut self, tts: &[ast::TokenTree]) -> IoResult<()> {
         try!(self.ibox(0));
         for (i, tt) in tts.iter().enumerate() {
             if i != 0 {
@@ -1264,7 +1194,7 @@ impl<'a> State<'a> {
         self.end()
     }
 
-    pub fn print_variant(&mut self, v: &ast::Variant) -> IoResult<()> {
+    fn print_variant(&mut self, v: &ast::Variant) -> IoResult<()> {
         try!(self.print_visibility(v.node.vis));
         match v.node.kind {
             ast::TupleVariantKind(ref args) => {
@@ -1293,7 +1223,7 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_ty_method(&mut self, m: &ast::TypeMethod) -> IoResult<()> {
+    fn print_ty_method(&mut self, m: &ast::TypeMethod) -> IoResult<()> {
         try!(self.hardbreak_if_not_bol());
         try!(self.maybe_print_comment(m.span.lo));
         try!(self.print_outer_attributes(m.attrs.as_slice()));
@@ -1309,7 +1239,7 @@ impl<'a> State<'a> {
         self.token(Token::Semi)
     }
 
-    pub fn print_trait_method(&mut self,
+    fn print_trait_method(&mut self,
                               m: &ast::TraitItem) -> IoResult<()> {
         match *m {
             RequiredMethod(ref ty_m) => self.print_ty_method(ty_m),
@@ -1318,14 +1248,14 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_impl_item(&mut self, ii: &ast::ImplItem) -> IoResult<()> {
+    fn print_impl_item(&mut self, ii: &ast::ImplItem) -> IoResult<()> {
         match *ii {
             MethodImplItem(ref m) => self.print_method(&**m),
             TypeImplItem(ref td) => self.print_typedef(&**td),
         }
     }
 
-    pub fn print_method(&mut self, meth: &ast::Method) -> IoResult<()> {
+    fn print_method(&mut self, meth: &ast::Method) -> IoResult<()> {
         try!(self.hardbreak_if_not_bol());
         try!(self.maybe_print_comment(meth.span.lo));
         try!(self.print_outer_attributes(meth.attrs.as_slice()));
@@ -1364,7 +1294,7 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_outer_attributes(&mut self,
+    fn print_outer_attributes(&mut self,
                                   attrs: &[ast::Attribute]) -> IoResult<()> {
         let mut count = 0u;
         for attr in attrs.iter() {
@@ -1382,7 +1312,7 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_inner_attributes(&mut self,
+    fn print_inner_attributes(&mut self,
                                   attrs: &[ast::Attribute]) -> IoResult<()> {
         let mut count = 0u;
         for attr in attrs.iter() {
@@ -1400,11 +1330,11 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_attribute(&mut self, attr: &ast::Attribute) -> IoResult<()> {
+    fn print_attribute(&mut self, attr: &ast::Attribute) -> IoResult<()> {
         try!(self.hardbreak_if_not_bol());
         try!(self.maybe_print_comment(attr.span.lo));
         if attr.node.is_sugared_doc {
-            word(&mut self.s, attr.value_str().unwrap().get())
+            self.doccomment(attr.value_str().unwrap().get())
         } else {
             match attr.node.style {
                 ast::AttrInner => {
@@ -1423,7 +1353,7 @@ impl<'a> State<'a> {
     }
 
 
-    pub fn print_stmt(&mut self, st: &ast::Stmt) -> IoResult<()> {
+    fn print_stmt(&mut self, st: &ast::Stmt) -> IoResult<()> {
         try!(self.maybe_print_comment(st.span.lo));
         match st.node {
             ast::StmtDecl(ref decl, _) => {
@@ -1457,21 +1387,21 @@ impl<'a> State<'a> {
         self.maybe_print_trailing_comment(st.span, None)
     }
 
-    pub fn print_block(&mut self, blk: &ast::Block) -> IoResult<()> {
+    fn print_block(&mut self, blk: &ast::Block) -> IoResult<()> {
         self.print_block_with_attrs(blk, &[])
     }
 
-    pub fn print_block_unclosed(&mut self, blk: &ast::Block) -> IoResult<()> {
+    fn print_block_unclosed(&mut self, blk: &ast::Block) -> IoResult<()> {
         self.print_block_maybe_unclosed(blk, indent_unit, &[], false)
     }
 
-    pub fn print_block_with_attrs(&mut self,
+    fn print_block_with_attrs(&mut self,
                                   blk: &ast::Block,
                                   attrs: &[ast::Attribute]) -> IoResult<()> {
         self.print_block_maybe_unclosed(blk, indent_unit, attrs, true)
     }
 
-    pub fn print_block_maybe_unclosed(&mut self,
+    fn print_block_maybe_unclosed(&mut self,
                                       blk: &ast::Block,
                                       indented: uint,
                                       attrs: &[ast::Attribute],
@@ -1481,7 +1411,7 @@ impl<'a> State<'a> {
             ast::DefaultBlock => ()
         }
         try!(self.maybe_print_comment(blk.span.lo));
-        try!(self.ann.pre(self, NodeBlock(blk)));
+        try!(self.ann_pre(NodeBlock(blk)));
         try!(self.bopen());
 
         try!(self.print_inner_attributes(attrs));
@@ -1501,7 +1431,7 @@ impl<'a> State<'a> {
             _ => ()
         }
         try!(self.bclose_maybe_open(blk.span, indented, close_box));
-        self.ann.post(self, NodeBlock(blk))
+        self.ann_post(NodeBlock(blk))
     }
 
     fn print_else(&mut self, els: Option<&ast::Expr>) -> IoResult<()> {
@@ -1560,7 +1490,7 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_if(&mut self, test: &ast::Expr, blk: &ast::Block,
+    fn print_if(&mut self, test: &ast::Expr, blk: &ast::Block,
                     elseopt: Option<&ast::Expr>) -> IoResult<()> {
         try!(self.head(|s| {
             s.keyword_nbsp(Keyword::If)
@@ -1571,7 +1501,7 @@ impl<'a> State<'a> {
         self.print_else(elseopt)
     }
 
-    pub fn print_if_let(&mut self, pat: &ast::Pat, expr: &ast::Expr, blk: &ast::Block,
+    fn print_if_let(&mut self, pat: &ast::Pat, expr: &ast::Expr, blk: &ast::Block,
                         elseopt: Option<&ast::Expr>) -> IoResult<()> {
         try!(self.head(|s| {
             try!(s.keyword_nbsp(Keyword::If));
@@ -1586,7 +1516,7 @@ impl<'a> State<'a> {
         self.print_else(elseopt)
     }
 
-    pub fn print_mac(&mut self, m: &ast::Mac, delim: token::DelimToken)
+    fn print_mac(&mut self, m: &ast::Mac, delim: token::DelimToken)
                      -> IoResult<()> {
         match m.node {
             // I think it's reasonable to hide the ctxt here:
@@ -1615,7 +1545,7 @@ impl<'a> State<'a> {
         self.pclose()
     }
 
-    pub fn print_expr_maybe_paren(&mut self, expr: &ast::Expr) -> IoResult<()> {
+    fn print_expr_maybe_paren(&mut self, expr: &ast::Expr) -> IoResult<()> {
         let needs_par = needs_parentheses(expr);
         if needs_par {
             try!(self.popen());
@@ -1627,10 +1557,10 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_expr(&mut self, expr: &ast::Expr) -> IoResult<()> {
+    fn print_expr(&mut self, expr: &ast::Expr) -> IoResult<()> {
         try!(self.maybe_print_comment(expr.span.lo));
         try!(self.ibox(indent_unit));
-        try!(self.ann.pre(self, NodeExpr(expr)));
+        try!(self.ann_pre(NodeExpr(expr)));
         match expr.node {
             ast::ExprBox(ref p, ref e) => {
                 try!(self.keyword(Keyword::Box));
@@ -1995,11 +1925,11 @@ impl<'a> State<'a> {
                 try!(self.pclose());
             }
         }
-        try!(self.ann.post(self, NodeExpr(expr)));
+        try!(self.ann_post(NodeExpr(expr)));
         self.end()
     }
 
-    pub fn print_local_decl(&mut self, loc: &ast::Local) -> IoResult<()> {
+    fn print_local_decl(&mut self, loc: &ast::Local) -> IoResult<()> {
         try!(self.print_pat(&*loc.pat));
         match loc.ty.node {
             ast::TyInfer => Ok(()),
@@ -2010,7 +1940,7 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_decl(&mut self, decl: &ast::Decl) -> IoResult<()> {
+    fn print_decl(&mut self, decl: &ast::Decl) -> IoResult<()> {
         try!(self.maybe_print_comment(decl.span.lo));
         match decl.node {
             ast::DeclLocal(ref loc) => {
@@ -2032,18 +1962,18 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_ident(&mut self, ident: ast::Ident) -> IoResult<()> {
+    fn print_ident(&mut self, ident: ast::Ident) -> IoResult<()> {
         try!(self.token(Token::Ident(ident, token::IdentStyle::Plain)));
-        self.ann.post(self, NodeIdent(&ident))
+        self.ann_post(NodeIdent(&ident))
     }
 
-    pub fn print_name(&mut self, name: ast::Name) -> IoResult<()> {
+    fn print_name(&mut self, name: ast::Name) -> IoResult<()> {
         let id = ast::Ident::new(name);
         try!(self.token(Token::Ident(id, token::IdentStyle::Plain)));
-        self.ann.post(NodeName(&name))
+        self.ann_post(NodeName(&name))
     }
 
-    pub fn print_for_decl(&mut self, loc: &ast::Local,
+    fn print_for_decl(&mut self, loc: &ast::Local,
                           coll: &ast::Expr) -> IoResult<()> {
         try!(self.print_local_decl(loc));
         try!(self.space());
@@ -2150,9 +2080,9 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_pat(&mut self, pat: &ast::Pat) -> IoResult<()> {
+    fn print_pat(&mut self, pat: &ast::Pat) -> IoResult<()> {
         try!(self.maybe_print_comment(pat.span.lo));
-        try!(self.ann.pre(self, NodePat(pat)));
+        try!(self.ann_pre(NodePat(pat)));
         /* Pat isn't normalized, but the beauty of it
          is that it doesn't matter */
         match pat.node {
@@ -2268,7 +2198,7 @@ impl<'a> State<'a> {
             }
             ast::PatMac(ref m) => try!(self.print_mac(m, token::Paren)),
         }
-        self.ann.post(self, NodePat(pat))
+        self.ann_post(NodePat(pat))
     }
 
     fn print_arm(&mut self, arm: &ast::Arm) -> IoResult<()> {
@@ -2343,7 +2273,7 @@ impl<'a> State<'a> {
         return Ok(true);
     }
 
-    pub fn print_fn(&mut self,
+    fn print_fn(&mut self,
                     decl: &ast::FnDecl,
                     unsafety: Option<ast::Unsafety>,
                     abi: abi::Abi,
@@ -2360,7 +2290,7 @@ impl<'a> State<'a> {
         self.print_where_clause(generics)
     }
 
-    pub fn print_fn_args(&mut self, decl: &ast::FnDecl,
+    fn print_fn_args(&mut self, decl: &ast::FnDecl,
                          opt_explicit_self: Option<&ast::ExplicitSelf_>)
         -> IoResult<()> {
         // It is unfortunate to duplicate the commasep logic, but we want the
@@ -2393,7 +2323,7 @@ impl<'a> State<'a> {
         self.end()
     }
 
-    pub fn print_fn_args_and_ret(&mut self, decl: &ast::FnDecl,
+    fn print_fn_args_and_ret(&mut self, decl: &ast::FnDecl,
                                  opt_explicit_self: Option<&ast::ExplicitSelf_>)
         -> IoResult<()> {
         try!(self.popen());
@@ -2408,7 +2338,7 @@ impl<'a> State<'a> {
         self.print_fn_output(decl)
     }
 
-    pub fn print_fn_block_args(
+    fn print_fn_block_args(
             &mut self,
             decl: &ast::FnDecl,
             unboxed_closure_kind: Option<UnboxedClosureKind>)
@@ -2454,7 +2384,7 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_capture_clause(&mut self, capture_clause: ast::CaptureClause)
+    fn print_capture_clause(&mut self, capture_clause: ast::CaptureClause)
                                 -> IoResult<()> {
         match capture_clause {
             ast::CaptureByValue => self.keyword_sp(Keyword::Move),
@@ -2462,7 +2392,7 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_proc_args(&mut self, decl: &ast::FnDecl) -> IoResult<()> {
+    fn print_proc_args(&mut self, decl: &ast::FnDecl) -> IoResult<()> {
         try!(self.keyword(Keyword::Proc));
         try!(self.popen());
         try!(self.print_fn_args(decl, None));
@@ -2488,7 +2418,7 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_bounds(&mut self,
+    fn print_bounds(&mut self,
                         prefix: Option<Token>,
                         bounds: &[ast::TyParamBound])
                         -> IoResult<()> {
@@ -2521,14 +2451,14 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_lifetime(&mut self,
+    fn print_lifetime(&mut self,
                           lifetime: &ast::Lifetime)
                           -> IoResult<()>
     {
         self.print_name(lifetime.name)
     }
 
-    pub fn print_lifetime_def(&mut self,
+    fn print_lifetime_def(&mut self,
                               lifetime: &ast::LifetimeDef)
                               -> IoResult<()>
     {
@@ -2542,7 +2472,7 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_generics(&mut self,
+    fn print_generics(&mut self,
                           generics: &ast::Generics)
                           -> IoResult<()>
     {
@@ -2573,7 +2503,7 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_ty_param(&mut self, param: &ast::TyParam) -> IoResult<()> {
+    fn print_ty_param(&mut self, param: &ast::TyParam) -> IoResult<()> {
         if let Some(ref tref) = param.unbound {
             try!(self.print_trait_ref(tref));
             try!(self.token_sp(Token::Question));
@@ -2590,7 +2520,7 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_where_clause(&mut self, generics: &ast::Generics)
+    fn print_where_clause(&mut self, generics: &ast::Generics)
                               -> IoResult<()> {
         if generics.where_clause.predicates.len() == 0 {
             return Ok(())
@@ -2640,7 +2570,7 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_meta_item(&mut self, item: &ast::MetaItem) -> IoResult<()> {
+    fn print_meta_item(&mut self, item: &ast::MetaItem) -> IoResult<()> {
         try!(self.ibox(indent_unit));
         match item.node {
             ast::MetaWord(ref name) => {
@@ -2664,7 +2594,7 @@ impl<'a> State<'a> {
         self.end()
     }
 
-    pub fn print_view_path(&mut self, vp: &ast::ViewPath) -> IoResult<()> {
+    fn print_view_path(&mut self, vp: &ast::ViewPath) -> IoResult<()> {
         match vp.node {
             ast::ViewPathSimple(ident, ref path, _) => {
                 try!(self.print_path(path, false));
@@ -2709,7 +2639,7 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_view_item(&mut self, item: &ast::ViewItem) -> IoResult<()> {
+    fn print_view_item(&mut self, item: &ast::ViewItem) -> IoResult<()> {
         try!(self.hardbreak_if_not_bol());
         try!(self.maybe_print_comment(item.span.lo));
         try!(self.print_outer_attributes(item.attrs.as_slice()));
@@ -2741,7 +2671,7 @@ impl<'a> State<'a> {
         self.end() // end outer head-block
     }
 
-    pub fn print_mutability(&mut self,
+    fn print_mutability(&mut self,
                             mutbl: ast::Mutability) -> IoResult<()> {
         match mutbl {
             ast::MutMutable => self.keyword_nbsp(Keyword::Mut),
@@ -2749,12 +2679,12 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_mt(&mut self, mt: &ast::MutTy) -> IoResult<()> {
+    fn print_mt(&mut self, mt: &ast::MutTy) -> IoResult<()> {
         try!(self.print_mutability(mt.mutbl));
         self.print_type(&*mt.ty)
     }
 
-    pub fn print_arg(&mut self, input: &ast::Arg) -> IoResult<()> {
+    fn print_arg(&mut self, input: &ast::Arg) -> IoResult<()> {
         try!(self.ibox(indent_unit));
         match input.ty.node {
             ast::TyInfer => try!(self.print_pat(&*input.pat)),
@@ -2777,7 +2707,7 @@ impl<'a> State<'a> {
         self.end()
     }
 
-    pub fn print_fn_output(&mut self, decl: &ast::FnDecl) -> IoResult<()> {
+    fn print_fn_output(&mut self, decl: &ast::FnDecl) -> IoResult<()> {
         if let ast::Return(ref ty) = decl.output {
             match ty.node {
                 ast::TyTup(ref tys) if tys.is_empty() => {
@@ -2804,7 +2734,7 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_ty_fn(&mut self,
+    fn print_ty_fn(&mut self,
                        opt_abi: Option<abi::Abi>,
                        opt_sigil: Option<char>,
                        unsafety: ast::Unsafety,
@@ -2840,7 +2770,7 @@ impl<'a> State<'a> {
         }
 
         match generics { Some(g) => try!(self.print_generics(g)), _ => () }
-        try!(zerobreak(&mut self.s));
+        try!(self.zerobreak());
 
         if opt_sigil == Some('&') {
             try!(self.binop_tok(BinOpToken::Or));
@@ -2873,7 +2803,241 @@ impl<'a> State<'a> {
         self.end()
     }
 
-    pub fn maybe_print_trailing_comment(&mut self, span: codemap::Span,
+    fn print_literal(&mut self, lit: &ast::Lit) -> IoResult<()> {
+        try!(self.maybe_print_comment(lit.span.lo));
+        if try!(self.print_next_lit(lit.span.lo)) {
+            return Ok(());
+        }
+
+        // ast::Lit is unescaped; token::Lit is escaped
+        let lit = match lit.node {
+            ast::LitStr(ref st, style) => return self.print_string(st.get(), style),
+            ast::LitByte(byte) => {
+                let mut res = String::new();
+                ascii::escape_default(byte, |c| res.push(c as char));
+
+                let name = token::intern(&*res);
+                token::Byte(name)
+            }
+            ast::LitChar(ch) => {
+                let mut res = String::new();
+                for c in ch.escape_default() { res.push(c); }
+
+                let name = token::intern(&*res);
+                token::Char(name)
+            }
+            ast::LitInt(i, t) => {
+                let s = match t {
+                    ast::SignedIntLit(st, ast::Plus) => {
+                        ast_util::int_ty_to_string(st, Some(i as i64))
+                    }
+                    ast::SignedIntLit(st, ast::Minus) => {
+                        ast_util::int_ty_to_string(st, Some(-(i as i64)))
+                    }
+                    ast::UnsignedIntLit(ut) => {
+                        ast_util::uint_ty_to_string(ut, Some(i))
+                    }
+                    ast::UnsuffixedIntLit(ast::Plus) => {
+                        format!("{}", i)
+                    }
+                    ast::UnsuffixedIntLit(ast::Minus) => {
+                        format!("-{}", i)
+                    }
+                };
+                let name = token::intern(&*s);
+                token::Integer(name)
+            }
+            ast::LitFloat(ref f, t) => {
+                let s = format!("{}{}", f.get(), ast_util::float_ty_to_string(t));
+                let name = token::intern(&*s);
+                token::Float(name)
+            }
+            ast::LitFloatUnsuffixed(ref f) => {
+                let name = token::intern(f.get());
+                token::Float(name)
+            }
+            ast::LitBool(val) => {
+                if val {
+                    try!(self.keyword(Keyword::True));
+                } else {
+                    try!(self.keyword(Keyword::False));
+                }
+                return Ok(());
+            }
+            ast::LitBinary(ref v) => {
+                let mut escaped: String = String::new();
+                for &ch in v.iter() {
+                    ascii::escape_default(ch as u8,
+                                          |ch| escaped.push(ch as char));
+                }
+                let name = token::intern(&*escaped);
+                token::Binary(name)
+            }
+        };
+        let token = Token::Literal(lit, None);
+        self.token(token)
+    }
+
+    fn print_string(&mut self, st: &str, style: ast::StrStyle) -> IoResult<()> {
+        let lit = match style {
+            // TODO: it seems strange that escape_default is necessary here
+            ast::CookedStr => token::Str_(token::intern(&*st.escape_default())),
+            ast::RawStr(n) => token::StrRaw(token::intern(st), n),
+        };
+        let token = Token::Literal(lit, None);
+        self.token(token)
+    }
+
+    fn print_opt_unsafety(&mut self,
+                            opt_unsafety: Option<ast::Unsafety>) -> IoResult<()> {
+        match opt_unsafety {
+            Some(unsafety) => self.print_unsafety(unsafety),
+            None => Ok(())
+        }
+    }
+
+    fn print_opt_abi_and_extern_if_nondefault(&mut self,
+                                                  opt_abi: Option<abi::Abi>)
+        -> IoResult<()> {
+        match opt_abi {
+            Some(abi::Rust) => Ok(()),
+            Some(abi) => {
+                try!(self.keyword_nbsp(Keyword::Extern));
+                self.print_abi(abi)
+            }
+            None => Ok(())
+        }
+    }
+
+    fn print_extern_opt_abi(&mut self,
+                                opt_abi: Option<abi::Abi>) -> IoResult<()> {
+        match opt_abi {
+            Some(abi) => {
+                try!(self.keyword_nbsp(Keyword::Extern));
+                self.print_abi(abi)
+            }
+            None => Ok(())
+        }
+    }
+
+    fn print_fn_header_info(&mut self,
+                                _opt_explicit_self: Option<&ast::ExplicitSelf_>,
+                                opt_unsafety: Option<ast::Unsafety>,
+                                abi: abi::Abi,
+                                vis: ast::Visibility) -> IoResult<()> {
+        try!(self.print_visibility(vis));
+        try!(self.print_opt_unsafety(opt_unsafety));
+
+        if abi != abi::Rust {
+            try!(self.keyword_nbsp(Keyword::Extern));
+            try!(self.print_abi(abi));
+        }
+
+        self.keyword(Keyword::Fn)
+    }
+
+    fn print_unsafety(&mut self, s: ast::Unsafety) -> IoResult<()> {
+        match s {
+            ast::Unsafety::Normal => Ok(()),
+            ast::Unsafety::Unsafe => self.keyword_nbsp(Keyword::Unsafe),
+        }
+    }
+}
+
+impl<T: PpWriter> AstWriter for T {}
+
+pub struct State<'a> {
+    pub s: pp::Printer,
+    cm: Option<&'a CodeMap>,
+    comments: Option<Vec<comments::Comment> >,
+    literals: Option<Vec<comments::Literal> >,
+    cur_cmnt_and_lit: CurrentCommentAndLiteral,
+    boxes: Vec<pp::Breaks>,
+    ann: &'a (PpAnn+'a),
+    encode_idents_with_hygiene: bool,
+}
+
+impl<'a> PpWriter for State<'a> {
+    fn token(&mut self, t: Token) -> IoResult<()> {
+        // token_to_string is not hygiene-aware
+        if let Token::Ident(ident, _) = t {
+            if self.encode_idents_with_hygiene {
+                let encoded = ident.encode_with_hygiene();
+                pp::word(&mut self.s, encoded.as_slice())
+            } else {
+                pp::word(&mut self.s, token::get_ident(ident).get())
+            }
+        } else {
+            let s = token_to_string(&t);
+            pp::word(&mut self.s, &*s)
+        }
+    }
+
+    // "raw box"
+    fn rbox(&mut self, u: uint, b: pp::Breaks) -> IoResult<()> {
+        self.boxes.push(b);
+        pp::rbox(&mut self.s, u, b)
+    }
+
+    fn end(&mut self) -> IoResult<()> {
+        self.boxes.pop().unwrap();
+        pp::end(&mut self.s)
+    }
+
+    fn space(&mut self) -> IoResult<()> { space(&mut self.s) }
+
+    fn nbsp(&mut self) -> IoResult<()> { word(&mut self.s, " ") }
+
+    fn hardbreak_if_not_bol(&mut self) -> IoResult<()> {
+        if !self.is_bol() {
+            try!(hardbreak(&mut self.s))
+        }
+        Ok(())
+    }
+
+    fn space_if_not_bol(&mut self) -> IoResult<()> {
+        if !self.is_bol() { try!(self.space()); }
+        Ok(())
+    }
+
+    fn break_offset_if_not_bol(&mut self, n: uint,
+                                   off: int) -> IoResult<()> {
+        if !self.is_bol() {
+            break_offset(&mut self.s, n, off)
+        } else {
+            if off != 0 && self.s.last_token().is_hardbreak_tok() {
+                // We do something pretty sketchy here: tuck the nonzero
+                // offset-adjustment we were going to deposit along with the
+                // break into the previous hardbreak.
+                self.s.replace_last_token(pp::hardbreak_tok_offset(off));
+            }
+            Ok(())
+        }
+    }
+
+    // Synthesizes a comment that was not textually present in the original source
+    // file.
+    fn synth_comment(&mut self, text: String) -> IoResult<()> {
+        try!(word(&mut self.s, "/*"));
+        try!(self.space());
+        try!(word(&mut self.s, text.as_slice()));
+        try!(self.space());
+        word(&mut self.s, "*/")
+    }
+
+    fn hardbreak(&mut self) -> IoResult<()> {
+        pp::hardbreak(&mut self.s)
+    }
+
+    fn zerobreak(&mut self) -> IoResult<()> {
+        pp::zerobreak(&mut self.s)
+    }
+
+    fn doccomment(&mut self, d: &str) -> IoResult<()> {
+        word(&mut self.s, d)
+    }
+
+    fn maybe_print_trailing_comment(&mut self, span: codemap::Span,
                                         next_pos: Option<BytePos>)
         -> IoResult<()> {
         let cm = match self.cm {
@@ -2898,7 +3062,22 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_remaining_comments(&mut self) -> IoResult<()> {
+    fn maybe_print_comment(&mut self, pos: BytePos) -> IoResult<()> {
+        loop {
+            match self.next_comment() {
+                Some(ref cmnt) => {
+                    if (*cmnt).pos < pos {
+                        try!(self.print_comment(cmnt));
+                        self.cur_cmnt_and_lit.cur_cmnt += 1u;
+                    } else { break; }
+                }
+                _ => break
+            }
+        }
+        Ok(())
+    }
+
+    fn print_remaining_comments(&mut self) -> IoResult<()> {
         // If there aren't any remaining comments, then we need to manually
         // make sure there is a line break at the end.
         if self.next_comment().is_none() {
@@ -2916,102 +3095,55 @@ impl<'a> State<'a> {
         Ok(())
     }
 
-    pub fn print_literal(&mut self, lit: &ast::Lit) -> IoResult<()> {
-        try!(self.maybe_print_comment(lit.span.lo));
-        match self.next_lit(lit.span.lo) {
-            Some(ref ltrl) => {
-                return word(&mut self.s, (*ltrl).lit.as_slice());
-            }
-            _ => ()
-        }
-        match lit.node {
-            ast::LitStr(ref st, style) => self.print_string(st.get(), style),
-            ast::LitByte(byte) => {
-                let mut res = String::from_str("b'");
-                ascii::escape_default(byte, |c| res.push(c as char));
-                res.push('\'');
-                word(&mut self.s, res.as_slice())
-            }
-            ast::LitChar(ch) => {
-                let mut res = String::from_str("'");
-                for c in ch.escape_default() {
-                    res.push(c);
-                }
-                res.push('\'');
-                word(&mut self.s, res.as_slice())
-            }
-            ast::LitInt(i, t) => {
-                match t {
-                    ast::SignedIntLit(st, ast::Plus) => {
-                        word(&mut self.s,
-                             ast_util::int_ty_to_string(st, Some(i as i64)).as_slice())
-                    }
-                    ast::SignedIntLit(st, ast::Minus) => {
-                        let istr = ast_util::int_ty_to_string(st, Some(-(i as i64)));
-                        word(&mut self.s,
-                             format!("-{}", istr).as_slice())
-                    }
-                    ast::UnsignedIntLit(ut) => {
-                        word(&mut self.s, ast_util::uint_ty_to_string(ut, Some(i)).as_slice())
-                    }
-                    ast::UnsuffixedIntLit(ast::Plus) => {
-                        word(&mut self.s, format!("{}", i).as_slice())
-                    }
-                    ast::UnsuffixedIntLit(ast::Minus) => {
-                        word(&mut self.s, format!("-{}", i).as_slice())
-                    }
-                }
-            }
-            ast::LitFloat(ref f, t) => {
-                word(&mut self.s,
-                     format!(
-                         "{}{}",
-                         f.get(),
-                         ast_util::float_ty_to_string(t).as_slice()).as_slice())
-            }
-            ast::LitFloatUnsuffixed(ref f) => word(&mut self.s, f.get()),
-            ast::LitBool(val) => {
-                if val { word(&mut self.s, "true") } else { word(&mut self.s, "false") }
-            }
-            ast::LitBinary(ref v) => {
-                let mut escaped: String = String::new();
-                for &ch in v.iter() {
-                    ascii::escape_default(ch as u8,
-                                          |ch| escaped.push(ch as char));
-                }
-                word(&mut self.s, format!("b\"{}\"", escaped).as_slice())
-            }
-        }
-    }
-
-    pub fn next_lit(&mut self, pos: BytePos) -> Option<comments::Literal> {
+    fn print_next_lit(&mut self, pos: BytePos) -> IoResult<bool> {
         match self.literals {
             Some(ref lits) => {
                 while self.cur_cmnt_and_lit.cur_lit < lits.len() {
                     let ltrl = (*lits)[self.cur_cmnt_and_lit.cur_lit].clone();
-                    if ltrl.pos > pos { return None; }
+                    if ltrl.pos > pos { return Ok(false); }
                     self.cur_cmnt_and_lit.cur_lit += 1u;
-                    if ltrl.pos == pos { return Some(ltrl); }
+                    if ltrl.pos == pos {
+                        try!(pp::word(&mut self.s, ltrl.lit.as_slice()));
+                        return Ok(true);
+                    }
                 }
-                None
+                Ok(false)
             }
-            _ => None
+            _ => Ok(false)
         }
     }
 
-    pub fn maybe_print_comment(&mut self, pos: BytePos) -> IoResult<()> {
-        loop {
-            match self.next_comment() {
-                Some(ref cmnt) => {
-                    if (*cmnt).pos < pos {
-                        try!(self.print_comment(cmnt));
-                        self.cur_cmnt_and_lit.cur_cmnt += 1u;
-                    } else { break; }
-                }
-                _ => break
-            }
-        }
-        Ok(())
+    fn ann_pre(&mut self, node: AnnNode) -> IoResult<()> {
+        self.ann.pre(self, node)
+    }
+
+    fn ann_post(&mut self, node: AnnNode) -> IoResult<()> {
+        self.ann.post(self, node)
+    }
+
+    fn eof(&mut self) -> IoResult<()> { pp::eof(&mut self.s) }
+}
+
+impl<'a> State<'a> {
+    pub fn ibox(&mut self, u: uint) -> IoResult<()> {
+        self.rbox(u, pp::Inconsistent)
+    }
+
+    pub fn cbox(&mut self, u: uint) -> IoResult<()> {
+        self.rbox(u, pp::Consistent)
+    }
+
+    pub fn is_begin(&mut self) -> bool {
+        match self.s.last_token() { pp::Begin(_) => true, _ => false }
+    }
+
+    pub fn is_end(&mut self) -> bool {
+        match self.s.last_token() { pp::End => true, _ => false }
+    }
+
+    // is this the beginning of a line?
+    pub fn is_bol(&mut self) -> bool {
+        self.s.last_token().is_eof() || self.s.last_token().is_hardbreak_tok()
     }
 
     pub fn print_comment(&mut self,
@@ -3065,21 +3197,6 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_string(&mut self, st: &str,
-                        style: ast::StrStyle) -> IoResult<()> {
-        let st = match style {
-            ast::CookedStr => {
-                (format!("\"{}\"", st.escape_default()))
-            }
-            ast::RawStr(n) => {
-                (format!("r{delim}\"{string}\"{delim}",
-                         delim="#".repeat(n),
-                         string=st))
-            }
-        };
-        word(&mut self.s, st.as_slice())
-    }
-
     pub fn next_comment(&mut self) -> Option<comments::Comment> {
         match self.comments {
             Some(ref cmnts) => {
@@ -3093,60 +3210,6 @@ impl<'a> State<'a> {
         }
     }
 
-    pub fn print_opt_unsafety(&mut self,
-                            opt_unsafety: Option<ast::Unsafety>) -> IoResult<()> {
-        match opt_unsafety {
-            Some(unsafety) => self.print_unsafety(unsafety),
-            None => Ok(())
-        }
-    }
-
-    pub fn print_opt_abi_and_extern_if_nondefault(&mut self,
-                                                  opt_abi: Option<abi::Abi>)
-        -> IoResult<()> {
-        match opt_abi {
-            Some(abi::Rust) => Ok(()),
-            Some(abi) => {
-                try!(self.keyword_nbsp(Keyword::Extern));
-                self.print_abi(abi)
-            }
-            None => Ok(())
-        }
-    }
-
-    pub fn print_extern_opt_abi(&mut self,
-                                opt_abi: Option<abi::Abi>) -> IoResult<()> {
-        match opt_abi {
-            Some(abi) => {
-                try!(self.keyword_nbsp(Keyword::Extern));
-                self.print_abi(abi)
-            }
-            None => Ok(())
-        }
-    }
-
-    pub fn print_fn_header_info(&mut self,
-                                _opt_explicit_self: Option<&ast::ExplicitSelf_>,
-                                opt_unsafety: Option<ast::Unsafety>,
-                                abi: abi::Abi,
-                                vis: ast::Visibility) -> IoResult<()> {
-        try!(self.print_visibility(vis));
-        try!(self.print_opt_unsafety(opt_unsafety));
-
-        if abi != abi::Rust {
-            try!(self.keyword_nbsp(Keyword::Extern));
-            try!(self.print_abi(abi));
-        }
-
-        self.keyword(Keyword::Fn)
-    }
-
-    pub fn print_unsafety(&mut self, s: ast::Unsafety) -> IoResult<()> {
-        match s {
-            ast::Unsafety::Normal => Ok(()),
-            ast::Unsafety::Unsafe => self.keyword_nbsp(Keyword::Unsafe),
-        }
-    }
 }
 
 #[cfg(test)]
