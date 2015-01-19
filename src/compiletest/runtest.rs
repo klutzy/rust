@@ -1101,7 +1101,11 @@ struct ProcRes {
 fn compile_test(config: &Config, props: &TestProps, testfile: &Path) -> ProcRes {
     let aux_dir = aux_output_dir_name(config, testfile);
     // FIXME (#9639): This needs to handle non-utf8 paths
-    let link_args = vec!("-L".to_string(), aux_dir.as_str().unwrap().to_string());
+    let mut link_args = vec!("-L".to_string(), aux_dir.as_str().unwrap().to_string());
+    if let Some(ref path) = config.manifest_path {
+        // inject manifest to avoid UAC issue. See #11207
+        link_args.push(path.clone());
+    }
     let args = make_compile_args(config,
                                  props,
                                  link_args,

@@ -166,6 +166,12 @@ pub struct Config {
     // the path containing LLDB's Python module
     pub lldb_python_dir: Option<String>,
 
+    // this flag is only meaningful on Windows: Windows >= 7 requires
+    // application manifest if the filename looks like installer
+    // (e.g. "update-fields.exe" or "multidispatch.exe")
+    // See #10512 and #11207.
+    pub manifest_path: Option<String>,
+
     // Explain what's going on
-    pub verbose: bool
+    pub verbose: bool,
 }

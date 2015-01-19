@@ -90,6 +90,7 @@ pub fn parse_config(args: Vec<String> ) -> Config {
           optopt("", "adb-test-dir", "path to tests for the android debugger", "PATH"),
           optopt("", "lldb-python-dir", "directory containing LLDB's python module", "PATH"),
           optopt("", "test-shard", "run shard A, of B shards, worth of the testsuite", "A.B"),
+          optopt("", "manifest-path", "path to Windows manifest resource", "PATH"),
           optflag("h", "help", "show this message"));
 
     assert!(!args.is_empty());
@@ -175,6 +176,7 @@ pub fn parse_config(args: Vec<String> ) -> Config {
             !opt_str2(matches.opt_str("adb-test-dir")).is_empty(),
         lldb_python_dir: matches.opt_str("lldb-python-dir"),
         test_shard: test::opt_shard(matches.opt_str("test-shard")),
+        manifest_path: matches.opt_str("manifest-path"),
         verbose: matches.opt_present("verbose"),
     }
 }
@@ -211,6 +213,7 @@ pub fn log_config(config: &Config) {
         None => logv(c, "test_shard: (all)".to_string()),
         Some((a,b)) => logv(c, format!("test_shard: {}.{}", a, b))
     }
+    logv(c, format!("manifest_path: {:?}", config.manifest_path));
     logv(c, format!("verbose: {}", config.verbose));
     logv(c, format!("\n"));
 }
