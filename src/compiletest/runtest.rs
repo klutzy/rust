@@ -113,17 +113,13 @@ fn run_cfail_test(config: &Config, props: &TestProps, testfile: &Path) {
 }
 
 fn run_rfail_test(config: &Config, props: &TestProps, testfile: &Path) {
-    let proc_res = if !config.jit {
-        let proc_res = compile_test(config, props, testfile);
+    let proc_res = compile_test(config, props, testfile);
 
-        if !proc_res.status.success() {
-            fatal_proc_rec("compilation failed!", &proc_res);
-        }
+    if !proc_res.status.success() {
+        fatal_proc_rec("compilation failed!", &proc_res);
+    }
 
-        exec_compiled_test(config, props, testfile)
-    } else {
-        jit_test(config, props, testfile)
-    };
+    let proc_res = exec_compiled_test(config, props, testfile);
 
     // The value our Makefile configures valgrind to return on failure
     static VALGRIND_ERR: int = 100;
@@ -148,24 +144,16 @@ fn check_correct_failure_status(proc_res: &ProcRes) {
 }
 
 fn run_rpass_test(config: &Config, props: &TestProps, testfile: &Path) {
-    if !config.jit {
-        let mut proc_res = compile_test(config, props, testfile);
+    let mut proc_res = compile_test(config, props, testfile);
 
-        if !proc_res.status.success() {
-            fatal_proc_rec("compilation failed!", &proc_res);
-        }
+    if !proc_res.status.success() {
+        fatal_proc_rec("compilation failed!", &proc_res);
+    }
 
-        proc_res = exec_compiled_test(config, props, testfile);
+    proc_res = exec_compiled_test(config, props, testfile);
 
-        if !proc_res.status.success() {
-            fatal_proc_rec("test run failed!", &proc_res);
-        }
-    } else {
-        let proc_res = jit_test(config, props, testfile);
-
-        if !proc_res.status.success() {
-            fatal_proc_rec("jit failed!", &proc_res);
-        }
+    if !proc_res.status.success() {
+        fatal_proc_rec("test run failed!", &proc_res);
     }
 }
 
@@ -1110,22 +1098,10 @@ struct ProcRes {
     cmdline: String,
 }
 
-fn compile_test(config: &Config, props: &TestProps,
-                testfile: &Path) -> ProcRes {
-    compile_test_(config, props, testfile, &[])
-}
-
-fn jit_test(config: &Config, props: &TestProps, testfile: &Path) -> ProcRes {
-    compile_test_(config, props, testfile, &["--jit".to_string()])
-}
-
-fn compile_test_(config: &Config, props: &TestProps,
-                 testfile: &Path, extra_args: &[String]) -> ProcRes {
+fn compile_test(config: &Config, props: &TestProps, testfile: &Path) -> ProcRes {
     let aux_dir = aux_output_dir_name(config, testfile);
     // FIXME (#9639): This needs to handle non-utf8 paths
-    let mut link_args = vec!("-L".to_string(),
-                             aux_dir.as_str().unwrap().to_string());
-    link_args.extend(extra_args.iter().map(|s| s.clone()));
+    let link_args = vec!("-L".to_string(), aux_dir.as_str().unwrap().to_string());
     let args = make_compile_args(config,
                                  props,
                                  link_args,
