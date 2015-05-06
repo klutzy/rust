@@ -869,7 +869,9 @@ generic_args
 ;
 
 generic_values
-: maybe_lifetimes maybe_ty_sums_and_or_bindings { $$ = mk_node("GenericValues", 2, $1, $2); }
+: lifetimes { $$ = mk_node("GenericValues", 2, $1, mk_none()); }
+| lifetimes ',' maybe_ty_sums_and_or_bindings { $$ = mk_node("GenericValues", 2, $1, $3); }
+| maybe_ty_sums_and_or_bindings { $$ = mk_node("GenericValues", 2, mk_none(), $1); }
 ;
 
 maybe_ty_sums_and_or_bindings
