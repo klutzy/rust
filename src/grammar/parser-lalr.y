@@ -895,6 +895,7 @@ pat
 | '&' pat                                         { $$ = mk_node("PatRegion", 1, $2); }
 | '&' MUT pat                                     { $$ = mk_node("PatRegion", 1, $3); }
 | ANDAND pat                                      { $$ = mk_node("PatRegion", 1, mk_node("PatRegion", 1, $2)); }
+| ANDAND MUT pat                                  { $$ = mk_node("PatRegion", 1, mk_node("PatRegion", 1, $3)); }
 | '(' ')'                                         { $$ = mk_atom("PatUnit"); }
 | '(' pat_tup ')'                                 { $$ = mk_node("PatTup", 1, $2); }
 | '(' pat_tup ',' ')'                             { $$ = mk_node("PatTup", 1, $2); }
