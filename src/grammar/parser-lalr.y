@@ -298,7 +298,7 @@ view_item
 : use_item
 | extern_fn_item
 | EXTERN CRATE ident ';'                      { $$ = mk_node("ViewItemExternCrate", 1, $3); }
-| EXTERN CRATE str AS ident ';'               { $$ = mk_node("ViewItemExternCrate", 2, $3, $5); }
+| EXTERN CRATE ident AS ident ';'               { $$ = mk_node("ViewItemExternCrate", 2, $3, $5); }
 ;
 
 extern_fn_item
