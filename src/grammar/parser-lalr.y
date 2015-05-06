@@ -1552,29 +1552,17 @@ nonblock_prefix_expr
 ;
 
 expr_qualified_path
-: '<' ty_sum maybe_as_trait_ref '>' MOD_SEP ident
+: '<' ty_sum maybe_as_trait_ref '>' MOD_SEP path_expr
 {
   $$ = mk_node("ExprQualifiedPath", 3, $2, $3, $6);
 }
-| '<' ty_sum maybe_as_trait_ref '>' MOD_SEP ident generic_args
-{
-  $$ = mk_node("ExprQualifiedPath", 4, $2, $3, $6, $7);
-}
-| SHL ty_sum maybe_as_trait_ref '>' MOD_SEP ident maybe_as_trait_ref '>' MOD_SEP ident
+| SHL ty_sum maybe_as_trait_ref '>' MOD_SEP ident maybe_as_trait_ref '>' MOD_SEP path_expr
 {
   $$ = mk_node("ExprQualifiedPath", 3, mk_node("ExprQualifiedPath", 3, $2, $3, $6), $7, $10);
 }
-| SHL ty_sum maybe_as_trait_ref '>' MOD_SEP ident generic_args maybe_as_trait_ref '>' MOD_SEP ident
+| SHL ty_sum maybe_as_trait_ref '>' MOD_SEP ident generic_args maybe_as_trait_ref '>' MOD_SEP path_expr
 {
   $$ = mk_node("ExprQualifiedPath", 3, mk_node("ExprQualifiedPath", 4, $2, $3, $6, $7), $8, $11);
-}
-| SHL ty_sum maybe_as_trait_ref '>' MOD_SEP ident maybe_as_trait_ref '>' MOD_SEP ident generic_args
-{
-  $$ = mk_node("ExprQualifiedPath", 4, mk_node("ExprQualifiedPath", 3, $2, $3, $6), $7, $10, $11);
-}
-| SHL ty_sum maybe_as_trait_ref '>' MOD_SEP ident generic_args maybe_as_trait_ref '>' MOD_SEP ident generic_args
-{
-  $$ = mk_node("ExprQualifiedPath", 4, mk_node("ExprQualifiedPath", 4, $2, $3, $6, $7), $8, $11, $12);
 }
 
 maybe_as_trait_ref
